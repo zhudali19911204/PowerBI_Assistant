@@ -1,0 +1,37 @@
+{
+  "eval_name": "eval-0",
+  "configuration": "without_skill",
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "expectations": [
+    {
+      "text": "Computes gross from [Gross Sales] or equivalent",
+      "passed": true,
+      "evidence": "reuses [Gross Sales]"
+    },
+    {
+      "text": "Values returns via Returns->Sales RELATED price, SUMX over 'Returns'",
+      "passed": true,
+      "evidence": "SUMX('Returns', ...) with RELATED('Sales'[Unit Price])*(1-RELATED('Sales'[Discount Pct]))"
+    },
+    {
+      "text": "Subtracts returned value from gross",
+      "passed": true,
+      "evidence": "[Gross Sales] - ReturnsValue"
+    },
+    {
+      "text": "Does NOT invent non-existent columns",
+      "passed": true,
+      "evidence": "explicitly avoids dividing a stored amount; real columns only"
+    },
+    {
+      "text": "Notes Returns has no price column so price comes from related Sales line",
+      "passed": true,
+      "evidence": "'Returns table has only Units Returned and no price, so ... RELATED'"
+    }
+  ]
+}

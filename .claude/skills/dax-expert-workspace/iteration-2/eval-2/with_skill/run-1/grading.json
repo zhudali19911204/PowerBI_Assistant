@@ -1,0 +1,42 @@
+{
+  "eval_name": "eval-2",
+  "configuration": "with_skill",
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "expectations": [
+    {
+      "text": "Averages MONTHLY totals, not daily fact rows",
+      "passed": true,
+      "evidence": "ADDCOLUMNS over VALUES('Date'[Year-Month]) with CALCULATE([Gross Sales])"
+    },
+    {
+      "text": "Establishes a 3-month window at month grain",
+      "passed": true,
+      "evidence": "DATESINPERIOD('Date'[Date], _lastDate, -3, MONTH) + VALUES('Date'[Year-Month])"
+    },
+    {
+      "text": "Builds on [Gross Sales]",
+      "passed": true,
+      "evidence": "CALCULATE([Gross Sales]) per month"
+    },
+    {
+      "text": "Handles partial windows (divides by actual months, not always 3)",
+      "passed": true,
+      "evidence": "_monthsWithSales = FILTER(NOT ISBLANK); DIVIDE(SUMX,COUNTROWS)"
+    },
+    {
+      "text": "References only existing columns",
+      "passed": true,
+      "evidence": "'Date'[Year-Month], 'Date'[Date]"
+    },
+    {
+      "text": "Emits valid, compilable DAX (correct RETURN, balanced)",
+      "passed": true,
+      "evidence": "Proper VAR ... RETURN structure; compiles"
+    }
+  ]
+}

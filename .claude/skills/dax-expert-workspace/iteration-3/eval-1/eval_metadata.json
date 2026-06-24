@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "eval_name": "multivar-pareto-cumulative",
+  "prompt": "[Cumulative Sales %]: for products ranked by Gross Sales descending, the running cumulative percentage of total gross sales (Pareto), respecting slicers, with Product on the axis. Retail-v2.",
+  "assertions": [
+    { "text": "Captures the denominator (grand total of Gross Sales over the visible product set) in a VAR using ALLSELECTED on the product so slicers are respected but the per-row product filter is lifted" },
+    { "text": "Builds a virtual product table with each product's [Gross Sales] via context transition (ADDCOLUMNS over ALLSELECTED products)" },
+    { "text": "Computes the cumulative numerator as the sum of Gross Sales for products whose sales are >= the current product's sales (rank/threshold logic), not a naive running sum by label" },
+    { "text": "Captures the current product's Gross Sales in a VAR to use as the threshold" },
+    { "text": "Uses DIVIDE for the percentage and defines multiple VARs for the multi-step calc" },
+    { "text": "References only existing columns and emits valid, compilable DAX" }
+  ]
+}

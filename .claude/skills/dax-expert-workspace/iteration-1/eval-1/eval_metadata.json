@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "optimize-slow-measure",
+  "prompt": "Optimize the slow 'US Sales Ratio' measure and explain what changed and why, grounded in the Contoso-lite schema.",
+  "assertions": [
+    { "text": "Replaces the whole-table FILTER(Sales, RELATED('Customer'[Country]) = \"United States\") with a column predicate 'Customer'[Country] = \"United States\"" },
+    { "text": "Uses DIVIDE instead of the / operator and removes the redundant IF divide-by-zero guard" },
+    { "text": "Stores the repeated CALCULATE subexpression(s) in VAR so each is computed once" },
+    { "text": "Provides a short list of what changed and why each change is faster or safer" },
+    { "text": "References only columns that exist in the schema" }
+  ]
+}

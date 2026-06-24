@@ -1,0 +1,13 @@
+{
+  "eval_id": 0,
+  "eval_name": "generate-yoy-growth",
+  "prompt": "Write a measure for year-over-year sales growth % (this year vs same period last year) grounded in the Contoso-lite schema.",
+  "assertions": [
+    { "text": "Builds on the existing [Total Sales] measure instead of re-summing Sales[NetAmount] from scratch" },
+    { "text": "Uses DIVIDE for the percentage rather than the / operator" },
+    { "text": "Uses SAMEPERIODLASTYEAR or DATEADD on 'Date'[Date] to get the prior-year value" },
+    { "text": "Uses VAR to capture the current and/or prior value" },
+    { "text": "References only tables/columns that exist in the schema (no invented columns such as Sales[Amount] or Sales[Date])" },
+    { "text": "Notes that the calculation relies on the marked Date table" }
+  ]
+}

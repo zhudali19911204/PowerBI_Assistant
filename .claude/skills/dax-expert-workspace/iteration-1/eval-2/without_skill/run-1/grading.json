@@ -1,0 +1,45 @@
+{
+  "eval_name": "generate-pct-of-category",
+  "configuration": "without_skill",
+  "passed": 6,
+  "total": 6,
+  "pass_rate": 1.0,
+  "expectations": [
+    {
+      "text": "Uses DIVIDE for the ratio",
+      "passed": true,
+      "evidence": "DIVIDE([Total Sales], CALCULATE(...))"
+    },
+    {
+      "text": "Clears product-level filters via REMOVEFILTERS on 'Product'[Product]/[Subcategory]",
+      "passed": true,
+      "evidence": "REMOVEFILTERS('Product'[Product], 'Product'[Subcategory])"
+    },
+    {
+      "text": "Keeps 'Product'[Category] and external slicers (Year/Country); does not wipe them",
+      "passed": true,
+      "evidence": "Category kept; explicitly preserves Date[Year], Customer[Country], Product[Color]"
+    },
+    {
+      "text": "Builds on [Total Sales]",
+      "passed": true,
+      "evidence": "Numerator and denominator use [Total Sales]"
+    },
+    {
+      "text": "References only existing columns",
+      "passed": true,
+      "evidence": "All real columns"
+    },
+    {
+      "text": "Explains other slicers remain in filter context",
+      "passed": true,
+      "evidence": "Detailed explanation that year/country slicer reduces both consistently"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "eval_name": "generate-pct-of-category",
+  "configuration": "with_skill",
+  "passed": 6,
+  "total": 6,
+  "pass_rate": 1.0,
+  "expectations": [
+    {
+      "text": "Uses DIVIDE for the ratio",
+      "passed": true,
+      "evidence": "DIVIDE(_productSales, _categorySales)"
+    },
+    {
+      "text": "Clears product-level filters via REMOVEFILTERS on 'Product'[Product]/[Subcategory]",
+      "passed": true,
+      "evidence": "REMOVEFILTERS('Product'[Product], 'Product'[Subcategory], 'Product'[Color])"
+    },
+    {
+      "text": "Keeps 'Product'[Category] and external slicers (Year/Country); does not wipe them",
+      "passed": true,
+      "evidence": "Category NOT removed; Year/Country untouched. NOTE: also removes 'Product'[Color], so a Color slicer would be ignored in the denominator -- debatable design choice"
+    },
+    {
+      "text": "Builds on [Total Sales]",
+      "passed": true,
+      "evidence": "VAR _productSales = [Total Sales]"
+    },
+    {
+      "text": "References only existing columns",
+      "passed": true,
+      "evidence": "All columns exist in schema"
+    },
+    {
+      "text": "Explains other slicers remain in filter context",
+      "passed": true,
+      "evidence": "'filters coming from other tables (Date[Year], Customer[Country]) are untouched'"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  }
+}

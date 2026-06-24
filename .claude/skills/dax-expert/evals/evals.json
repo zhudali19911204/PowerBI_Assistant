@@ -1,0 +1,27 @@
+{
+  "skill_name": "dax-expert",
+  "shared_model_schema": "MODEL: Contoso-lite (star schema, Power BI Tabular).\n\nFACT TABLE 'Sales':\n  Sales[SalesKey] (int, unique)\n  Sales[OrderDateKey] (int)   -- relates to 'Date'[DateKey]\n  Sales[ProductKey] (int)     -- relates to 'Product'[ProductKey]\n  Sales[CustomerKey] (int)    -- relates to 'Customer'[CustomerKey]\n  Sales[Quantity] (int)\n  Sales[NetPrice] (decimal)\n  Sales[NetAmount] (decimal)  -- already = Quantity * NetPrice\n  Sales[ReturnFlag] (int, 0/1)\n\nDIMENSION 'Date' (MARKED as Date table, one contiguous row per day):\n  'Date'[DateKey] (int)\n  'Date'[Date] (date)\n  'Date'[Year] (int)\n  'Date'[Month] (text)\n  'Date'[MonthNumber] (int)\n\nDIMENSION 'Product':\n  'Product'[ProductKey] (int)\n  'Product'[Product] (text)\n  'Product'[Subcategory] (text)\n  'Product'[Category] (text)\n  'Product'[Color] (text)\n\nDIMENSION 'Customer':\n  'Customer'[CustomerKey] (int)\n  'Customer'[Customer] (text)\n  'Customer'[Country] (text)\n\nRELATIONSHIPS (active, single direction, one-to-many from dim to Sales):\n  Sales[OrderDateKey] -> 'Date'[DateKey]\n  Sales[ProductKey]   -> 'Product'[ProductKey]\n  Sales[CustomerKey]  -> 'Customer'[CustomerKey]\n\nEXISTING MEASURES:\n  [Total Sales] = SUM ( Sales[NetAmount] )",
+  "evals": [
+    {
+      "id": 0,
+      "name": "generate-yoy-growth",
+      "prompt": "Using the model below, write a Power BI measure that shows year-over-year sales growth as a percentage (this year vs the same period last year). Give me the measure and a short explanation.\n\n<MODEL_SCHEMA>",
+      "expected_output": "A measure named e.g. [Sales YoY %] that builds on [Total Sales], shifts the date filter via SAMEPERIODLASTYEAR('Date'[Date]) (or DATEADD), uses VAR to capture current and prior values, and uses DIVIDE for the percentage. References only columns/measures that exist in the schema. Mentions it relies on the marked Date table.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "optimize-slow-measure",
+      "prompt": "This measure is slow and I think it can be cleaner. Optimize it and tell me what you changed and why. Use the model schema below.\n\nExisting measure:\nUS Sales Ratio =\nIF (\n    CALCULATE ( SUM ( Sales[NetAmount] ), FILTER ( Sales, RELATED ( 'Customer'[Country] ) = \"United States\" ) ) > 0,\n    CALCULATE ( SUM ( Sales[Quantity] ), FILTER ( Sales, RELATED ( 'Customer'[Country] ) = \"United States\" ) )\n        / CALCULATE ( SUM ( Sales[NetAmount] ), FILTER ( Sales, RELATED ( 'Customer'[Country] ) = \"United States\" ) ),\n    BLANK ()\n)\n\n<MODEL_SCHEMA>",
+      "expected_output": "An optimized measure that: replaces the whole-table FILTER(Sales, RELATED(...)) with a column predicate 'Customer'[Country] = \"United States\"; replaces the / division and the IF guard with DIVIDE; stores the repeated CALCULATE subexpressions in VARs so they are computed once; plus a short list of what changed and why each is faster/safer. Only references existing columns.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "generate-pct-of-category",
+      "prompt": "I want a measure that shows each product's sales as a percentage of its product category total, and it should still respect whatever slicers the user has applied (year, country, etc.). Write it using the model below and explain briefly.\n\n<MODEL_SCHEMA>",
+      "expected_output": "A measure using DIVIDE([Total Sales], CALCULATE([Total Sales], REMOVEFILTERS('Product'[Product], 'Product'[Subcategory]))) or equivalent that clears only the product-level filters within the category (keeps Category and other slicers like Year/Country). Uses real columns only. Explains that REMOVEFILTERS clears the product grouping while other slicers remain in the filter context.",
+      "files": []
+    }
+  ]
+}

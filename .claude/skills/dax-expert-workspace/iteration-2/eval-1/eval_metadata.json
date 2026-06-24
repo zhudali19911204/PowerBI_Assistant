@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "eval_name": "customers-above-average",
+  "prompt": "Count customers whose total gross sales exceed the average gross sales per customer in the current filter context. Grounded in Retail-v2.",
+  "assertions": [
+    { "text": "Iterates the customer dimension with VALUES('Customer'[Customer ID]) (or the customer table), not the fact rows" },
+    { "text": "Relies on context transition to get each customer's own total — references [Gross Sales] (or CALCULATE) inside the iterator so the measure re-evaluates per customer" },
+    { "text": "Computes the threshold with AVERAGEX over customers (average of per-customer totals), NOT a flat AVERAGE of fact rows or AVERAGE of a column" },
+    { "text": "Freezes the average in a VAR before counting, so it is not recomputed per row / under the wrong context" },
+    { "text": "Counts customers above the threshold via COUNTROWS(FILTER(... [Gross Sales] > _avg ...)) or equivalent" },
+    { "text": "References only existing columns" }
+  ]
+}

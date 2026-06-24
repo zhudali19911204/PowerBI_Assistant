@@ -1,0 +1,13 @@
+{
+  "eval_id": 2,
+  "eval_name": "rolling-3-month-average",
+  "prompt": "3-month moving average of monthly gross sales (current + previous two months), displayed at month level, handling the first months with fewer than 3 months of data. Grounded in Retail-v2.",
+  "assertions": [
+    { "text": "Averages MONTHLY totals, not daily fact rows (does not just AVERAGEX over Sales rows or divide by day count)" },
+    { "text": "Establishes a 3-month window at month grain, e.g. DATESINPERIOD('Date'[Date], MAX('Date'[Date]), -3, MONTH) or iterating VALUES of a month column" },
+    { "text": "Builds on [Gross Sales]" },
+    { "text": "Handles partial windows correctly — divides by the actual number of months that have data (or uses AVERAGEX over months, which handles it naturally), rather than always dividing by 3" },
+    { "text": "References only existing columns ('Date'[Date], 'Date'[Year-Month], etc.)" },
+    { "text": "Emits valid, compilable DAX (correct RETURN keyword, balanced VAR/RETURN, no syntax errors)" }
+  ]
+}

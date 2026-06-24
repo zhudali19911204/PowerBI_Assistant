@@ -1,0 +1,450 @@
+{
+  "metadata": {
+    "skill_name": "dax-expert",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-06-23T14:52:35Z",
+    "evals_run": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 0,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 27.8,
+        "tokens": 19431,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Uses NESTED iteration: outer over months, inner over days",
+          "passed": true,
+          "evidence": "AVERAGEX(VALUES('Date'[Year-Month]), MAXX(VALUES('Date'[Date]), [Gross Sales]))"
+        },
+        {
+          "text": "Inner finds MAX daily Gross Sales within a month",
+          "passed": true,
+          "evidence": "MAXX(VALUES('Date'[Date]), [Gross Sales])"
+        },
+        {
+          "text": "Outer AVERAGEs the per-month peaks across months",
+          "passed": true,
+          "evidence": "AVERAGEX over VALUES('Date'[Year-Month])"
+        },
+        {
+          "text": "Context transition re-evaluates [Gross Sales] at day grain in inner iterator",
+          "passed": true,
+          "evidence": "[Gross Sales] measure ref transitions per day inside MAXX"
+        },
+        {
+          "text": "Builds on [Gross Sales]; only existing columns",
+          "passed": true,
+          "evidence": "reuses [Gross Sales]; real columns"
+        },
+        {
+          "text": "Valid, compilable DAX",
+          "passed": true,
+          "evidence": "clean structure. (Caveat: correct only at month-grain cells; at a year/total the inner VALUES('Date'[Date]) is not month-scoped -- shared by both configs)"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 43.4,
+        "tokens": 20017,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Denominator via ALLSELECTED on product, slicers respected, per-row product filter lifted",
+          "passed": true,
+          "evidence": "ALLSELECTED('Product'[Product Name]); SUMX grand total"
+        },
+        {
+          "text": "Virtual product table with [Gross Sales] via context transition",
+          "passed": true,
+          "evidence": "ADDCOLUMNS(ALLSELECTED(...), '@Gross', [Gross Sales])"
+        },
+        {
+          "text": "Cumulative = sum of sales for products with sales >= current (threshold logic)",
+          "passed": true,
+          "evidence": "SUMX(FILTER(_ProductsWithSales, [@Gross] >= _CurrentGross), [@Gross])"
+        },
+        {
+          "text": "Captures current product's Gross Sales in a VAR (threshold)",
+          "passed": true,
+          "evidence": "VAR _CurrentGross = [Gross Sales]"
+        },
+        {
+          "text": "DIVIDE + multiple VARs",
+          "passed": true,
+          "evidence": "4 VARs; DIVIDE(_CumulativeTotal, _GrandTotal)"
+        },
+        {
+          "text": "Only existing columns; valid DAX",
+          "passed": true,
+          "evidence": "valid; real columns"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.833,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 35.3,
+        "tokens": 19981,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "COGS = units sold * Product[Standard Cost] (SUMX with RELATED)",
+          "passed": true,
+          "evidence": "SUMX('Sales','Sales'[Units]*RELATED('Product'[Standard Cost]))"
+        },
+        {
+          "text": "Average inventory AVERAGED over days (semi-additive over time, not summed)",
+          "passed": false,
+          "evidence": "Subtle shared flaw: inner SUMX('Inventory',...) has no CALCULATE/measure wrapper, so AVERAGEX over days gets NO context transition -- each day sums the whole-period inventory, not that day's. Needs AVERAGEX(VALUES('Date'[Date]), CALCULATE(SUMX('Inventory',...))). Same defect in both configs; only live EVALUATE would catch it."
+        },
+        {
+          "text": "Inventory valued at Standard Cost in the daily aggregation",
+          "passed": true,
+          "evidence": "'Inventory'[Units On Hand] * RELATED('Product'[Standard Cost])"
+        },
+        {
+          "text": "DIVIDE for the turnover ratio",
+          "passed": true,
+          "evidence": "DIVIDE(_COGS, _AvgInventoryValue)"
+        },
+        {
+          "text": "Multiple VARs; only existing columns",
+          "passed": true,
+          "evidence": "_COGS, _AvgInventoryValue; real columns"
+        },
+        {
+          "text": "Valid, compilable DAX",
+          "passed": true,
+          "evidence": "compiles"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 34.0,
+        "tokens": 20040,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Distinct customers active in current period",
+          "passed": true,
+          "evidence": "VAR _currentMonthCustomers = VALUES(Sales[Customer ID])"
+        },
+        {
+          "text": "Distinct customers active in PRIOR month via shifted date context",
+          "passed": true,
+          "evidence": "CALCULATETABLE(VALUES(Sales[Customer ID]), PREVIOUSMONTH('Date'[Date]))"
+        },
+        {
+          "text": "Intersects the two customer sets",
+          "passed": true,
+          "evidence": "INTERSECT(_currentMonthCustomers, _priorMonthCustomers)"
+        },
+        {
+          "text": "COUNTROWS + DIVIDE by prior-month active count for rate",
+          "passed": true,
+          "evidence": "COUNTROWS(_retained); DIVIDE([Retained Customers], _priorMonthActive)"
+        },
+        {
+          "text": "Multiple VARs; only existing columns",
+          "passed": true,
+          "evidence": "3 VARs; real columns"
+        },
+        {
+          "text": "Valid, compilable DAX",
+          "passed": true,
+          "evidence": "both measures valid"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 0,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 31.3,
+        "tokens": 16620,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Uses NESTED iteration: outer over months, inner over days",
+          "passed": true,
+          "evidence": "Identical AVERAGEX/MAXX nesting"
+        },
+        {
+          "text": "Inner finds MAX daily Gross Sales within a month",
+          "passed": true,
+          "evidence": "MAXX(VALUES('Date'[Date]), [Gross Sales])"
+        },
+        {
+          "text": "Outer AVERAGEs the per-month peaks across months",
+          "passed": true,
+          "evidence": "AVERAGEX over VALUES('Date'[Year-Month])"
+        },
+        {
+          "text": "Context transition re-evaluates [Gross Sales] at day grain in inner iterator",
+          "passed": true,
+          "evidence": "[Gross Sales] transitions per day"
+        },
+        {
+          "text": "Builds on [Gross Sales]; only existing columns",
+          "passed": true,
+          "evidence": "reuses [Gross Sales]"
+        },
+        {
+          "text": "Valid, compilable DAX",
+          "passed": true,
+          "evidence": "clean. Same month-grain caveat as with_skill"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 27.7,
+        "tokens": 13362,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Denominator via ALLSELECTED on product, slicers respected, per-row product filter lifted",
+          "passed": true,
+          "evidence": "Uses CALCULATETABLE(...,REMOVEFILTERS('Product'[Product Name])) -- achieves same goal (per-row lifted, Year/Region/Category kept); differs from ALLSELECTED only if a Product-Name slicer exists"
+        },
+        {
+          "text": "Virtual product table with [Gross Sales] via context transition",
+          "passed": true,
+          "evidence": "ADDCOLUMNS(VALUES('Product'[Product Name]), '@Sales', [Gross Sales])"
+        },
+        {
+          "text": "Cumulative = sum of sales for products with sales >= current (threshold logic)",
+          "passed": true,
+          "evidence": "SUMX(FILTER(AllProducts, [@Sales] >= CurrentProductSales), [@Sales])"
+        },
+        {
+          "text": "Captures current product's Gross Sales in a VAR (threshold)",
+          "passed": true,
+          "evidence": "VAR CurrentProductSales = [Gross Sales]"
+        },
+        {
+          "text": "DIVIDE + multiple VARs",
+          "passed": true,
+          "evidence": "4 VARs; DIVIDE(CumulativeSales, TotalSales)"
+        },
+        {
+          "text": "Only existing columns; valid DAX",
+          "passed": true,
+          "evidence": "valid; real columns"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.833,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 30.4,
+        "tokens": 17373,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "COGS = units sold * Product[Standard Cost] (SUMX with RELATED)",
+          "passed": true,
+          "evidence": "SUMX('Sales','Sales'[Units]*RELATED('Product'[Standard Cost]))"
+        },
+        {
+          "text": "Average inventory AVERAGED over days (semi-additive over time, not summed)",
+          "passed": false,
+          "evidence": "Subtle shared flaw: inner SUMX('Inventory',...) has no CALCULATE/measure wrapper, so AVERAGEX over days gets NO context transition -- each day sums the whole-period inventory, not that day's. Needs AVERAGEX(VALUES('Date'[Date]), CALCULATE(SUMX('Inventory',...))). Same defect in both configs; only live EVALUATE would catch it. (uses CALCULATETABLE(VALUES('Date'[Date]),'Inventory') for the day set, but inner SUMX still lacks transition)"
+        },
+        {
+          "text": "Inventory valued at Standard Cost in the daily aggregation",
+          "passed": true,
+          "evidence": "Units On Hand * RELATED('Product'[Standard Cost])"
+        },
+        {
+          "text": "DIVIDE for the turnover ratio",
+          "passed": true,
+          "evidence": "DIVIDE(_COGS, _AvgInventoryValue)"
+        },
+        {
+          "text": "Multiple VARs; only existing columns",
+          "passed": true,
+          "evidence": "real columns"
+        },
+        {
+          "text": "Valid, compilable DAX",
+          "passed": true,
+          "evidence": "compiles"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 33.4,
+        "tokens": 13392,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Distinct customers active in current period",
+          "passed": true,
+          "evidence": "VAR CurrentMonthCustomers = DISTINCT(Sales[Customer ID])"
+        },
+        {
+          "text": "Distinct customers active in PRIOR month via shifted date context",
+          "passed": true,
+          "evidence": "CALCULATETABLE(DISTINCT(Sales[Customer ID]), DATEADD('Date'[Date],-1,MONTH))"
+        },
+        {
+          "text": "Intersects the two customer sets",
+          "passed": true,
+          "evidence": "INTERSECT(CurrentMonthCustomers, PriorMonthCustomers)"
+        },
+        {
+          "text": "COUNTROWS + DIVIDE by prior-month active count for rate",
+          "passed": true,
+          "evidence": "COUNTROWS(INTERSECT(...)); DIVIDE([Retained Customers], PriorMonthActive)"
+        },
+        {
+          "text": "Multiple VARs; only existing columns",
+          "passed": true,
+          "evidence": "real columns"
+        },
+        {
+          "text": "Valid, compilable DAX",
+          "passed": true,
+          "evidence": "both measures valid"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 0.9583,
+        "stddev": 0.0835,
+        "min": 0.833,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 35.125,
+        "stddev": 6.4142,
+        "min": 27.8,
+        "max": 43.4
+      },
+      "tokens": {
+        "mean": 19867.25,
+        "stddev": 291.8451,
+        "min": 19431,
+        "max": 20040
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.9583,
+        "stddev": 0.0835,
+        "min": 0.833,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 30.7,
+        "stddev": 2.3622,
+        "min": 27.7,
+        "max": 33.4
+      },
+      "tokens": {
+        "mean": 15186.75,
+        "stddev": 2112.2448,
+        "min": 13362,
+        "max": 17373
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.00",
+      "time_seconds": "+4.4",
+      "tokens": "+4680"
+    }
+  },
+  "notes": []
+}

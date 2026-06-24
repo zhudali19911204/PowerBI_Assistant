@@ -1,0 +1,13 @@
+{
+  "eval_id": 2,
+  "eval_name": "generate-pct-of-category",
+  "prompt": "Write a measure for each product's sales as a % of its category total that still respects slicers (year, country), grounded in the Contoso-lite schema.",
+  "assertions": [
+    { "text": "Uses DIVIDE for the ratio" },
+    { "text": "Clears product-level filters with REMOVEFILTERS/ALL on 'Product'[Product] (and/or 'Product'[Subcategory]) to build the category denominator" },
+    { "text": "Denominator keeps 'Product'[Category] and other slicers — does NOT wipe them with REMOVEFILTERS('Product') wholesale or ALL() that removes Year/Country" },
+    { "text": "Builds on the existing [Total Sales] measure" },
+    { "text": "References only columns that exist in the schema" },
+    { "text": "Explains that other slicers (Year, Country) remain in the filter context" }
+  ]
+}

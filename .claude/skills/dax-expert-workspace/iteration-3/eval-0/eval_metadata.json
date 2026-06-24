@@ -1,0 +1,13 @@
+{
+  "eval_id": 0,
+  "eval_name": "nested-context-monthly-peak-avg",
+  "prompt": "Average across months of each month's single best (maximum) daily Gross Sales. Within each month find the highest daily Gross Sales, then average those monthly peaks across the months in context. Retail-v2.",
+  "assertions": [
+    { "text": "Uses NESTED iteration: an outer iterator over months and an inner iterator over the days within each month" },
+    { "text": "Inner step finds the MAXIMUM daily Gross Sales within a month (e.g. MAXX over VALUES('Date'[Date]) of [Gross Sales])" },
+    { "text": "Outer step AVERAGEs those per-month peak values across months (AVERAGEX over the months in context)" },
+    { "text": "Relies on context transition so [Gross Sales] is re-evaluated at day grain inside the inner iterator (not a flat aggregate)" },
+    { "text": "Builds on [Gross Sales] and references only existing columns" },
+    { "text": "Emits valid, compilable DAX (correct VAR/RETURN, balanced parentheses)" }
+  ]
+}

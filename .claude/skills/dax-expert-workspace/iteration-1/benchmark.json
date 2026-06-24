@@ -1,0 +1,343 @@
+{
+  "metadata": {
+    "skill_name": "dax-expert",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-06-23T14:33:46Z",
+    "evals_run": [
+      0,
+      1,
+      2
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 0,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 34.7,
+        "tokens": 19905,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Builds on the existing [Total Sales] measure",
+          "passed": true,
+          "evidence": "VAR _currentSales = [Total Sales]; prior year via CALCULATE([Total Sales], ...)"
+        },
+        {
+          "text": "Uses DIVIDE for the percentage rather than /",
+          "passed": true,
+          "evidence": "RETURN DIVIDE(_currentSales - _priorYearSales, _priorYearSales)"
+        },
+        {
+          "text": "Uses SAMEPERIODLASTYEAR/DATEADD on 'Date'[Date]",
+          "passed": true,
+          "evidence": "CALCULATE([Total Sales], SAMEPERIODLASTYEAR('Date'[Date]))"
+        },
+        {
+          "text": "Uses VAR to capture current/prior value",
+          "passed": true,
+          "evidence": "Two VARs: _currentSales, _priorYearSales"
+        },
+        {
+          "text": "References only existing tables/columns",
+          "passed": true,
+          "evidence": "Only [Total Sales] and 'Date'[Date] used"
+        },
+        {
+          "text": "Notes reliance on the marked Date table",
+          "passed": true,
+          "evidence": "Assumptions: 'Date' marked as a Date table, contiguous days, required for SAMEPERIODLASTYEAR"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 28.6,
+        "tokens": 20022,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Replaces whole-table FILTER(...) with column predicate 'Customer'[Country] = \"United States\"",
+          "passed": true,
+          "evidence": "CALCULATE(SUM(Sales[Quantity]), 'Customer'[Country] = \"United States\")"
+        },
+        {
+          "text": "Uses DIVIDE instead of / AND removes the redundant IF divide-by-zero guard",
+          "passed": true,
+          "evidence": "Dropped the IF guard entirely; RETURN DIVIDE(_usQuantity, _usNetAmount). Explicitly explains DIVIDE makes the >0 guard unnecessary"
+        },
+        {
+          "text": "Stores repeated CALCULATE subexpression in VAR (computed once)",
+          "passed": true,
+          "evidence": "_usQuantity / _usNetAmount VARs; notes original evaluated NetAmount twice"
+        },
+        {
+          "text": "Lists what changed and why faster/safer",
+          "passed": true,
+          "evidence": "4 bullets tagged (real performance / safety) with reasoning"
+        },
+        {
+          "text": "References only existing columns",
+          "passed": true,
+          "evidence": "Sales[Quantity], Sales[NetAmount], 'Customer'[Country]"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 34.9,
+        "tokens": 19970,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Uses DIVIDE for the ratio",
+          "passed": true,
+          "evidence": "DIVIDE(_productSales, _categorySales)"
+        },
+        {
+          "text": "Clears product-level filters via REMOVEFILTERS on 'Product'[Product]/[Subcategory]",
+          "passed": true,
+          "evidence": "REMOVEFILTERS('Product'[Product], 'Product'[Subcategory], 'Product'[Color])"
+        },
+        {
+          "text": "Keeps 'Product'[Category] and external slicers (Year/Country); does not wipe them",
+          "passed": true,
+          "evidence": "Category NOT removed; Year/Country untouched. NOTE: also removes 'Product'[Color], so a Color slicer would be ignored in the denominator -- debatable design choice"
+        },
+        {
+          "text": "Builds on [Total Sales]",
+          "passed": true,
+          "evidence": "VAR _productSales = [Total Sales]"
+        },
+        {
+          "text": "References only existing columns",
+          "passed": true,
+          "evidence": "All columns exist in schema"
+        },
+        {
+          "text": "Explains other slicers remain in filter context",
+          "passed": true,
+          "evidence": "'filters coming from other tables (Date[Year], Customer[Country]) are untouched'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 0,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 25.4,
+        "tokens": 13253,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Builds on the existing [Total Sales] measure",
+          "passed": true,
+          "evidence": "VAR _CurrentSales = [Total Sales]"
+        },
+        {
+          "text": "Uses DIVIDE for the percentage rather than /",
+          "passed": true,
+          "evidence": "DIVIDE(_CurrentSales - _PriorYearSales, _PriorYearSales)"
+        },
+        {
+          "text": "Uses SAMEPERIODLASTYEAR/DATEADD on 'Date'[Date]",
+          "passed": true,
+          "evidence": "SAMEPERIODLASTYEAR('Date'[Date])"
+        },
+        {
+          "text": "Uses VAR to capture current/prior value",
+          "passed": true,
+          "evidence": "VARs _CurrentSales, _PriorYearSales, _Result"
+        },
+        {
+          "text": "References only existing tables/columns",
+          "passed": true,
+          "evidence": "Only [Total Sales] and 'Date'[Date]"
+        },
+        {
+          "text": "Notes reliance on the marked Date table",
+          "passed": true,
+          "evidence": "Explanation: 'SAMEPERIODLASTYEAR requires a marked Date table with a contiguous day-grain date column'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8,
+        "passed": 4,
+        "failed": 1,
+        "total": 5,
+        "time_seconds": 24.4,
+        "tokens": 13716,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Replaces whole-table FILTER(...) with column predicate 'Customer'[Country] = \"United States\"",
+          "passed": true,
+          "evidence": "CALCULATE(SUM(Sales[NetAmount]), 'Customer'[Country] = \"United States\")"
+        },
+        {
+          "text": "Uses DIVIDE instead of / AND removes the redundant IF divide-by-zero guard",
+          "passed": false,
+          "evidence": "Uses DIVIDE but KEEPS IF(USNetAmount > 0, DIVIDE(...)) -- the guard is now redundant with DIVIDE; it was retained 'to preserve original behavior'"
+        },
+        {
+          "text": "Stores repeated CALCULATE subexpression in VAR (computed once)",
+          "passed": true,
+          "evidence": "USNetAmount / USQuantity VARs"
+        },
+        {
+          "text": "Lists what changed and why faster/safer",
+          "passed": true,
+          "evidence": "3 numbered points with reasoning"
+        },
+        {
+          "text": "References only existing columns",
+          "passed": true,
+          "evidence": "All real columns"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 21.9,
+        "tokens": 13188,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Uses DIVIDE for the ratio",
+          "passed": true,
+          "evidence": "DIVIDE([Total Sales], CALCULATE(...))"
+        },
+        {
+          "text": "Clears product-level filters via REMOVEFILTERS on 'Product'[Product]/[Subcategory]",
+          "passed": true,
+          "evidence": "REMOVEFILTERS('Product'[Product], 'Product'[Subcategory])"
+        },
+        {
+          "text": "Keeps 'Product'[Category] and external slicers (Year/Country); does not wipe them",
+          "passed": true,
+          "evidence": "Category kept; explicitly preserves Date[Year], Customer[Country], Product[Color]"
+        },
+        {
+          "text": "Builds on [Total Sales]",
+          "passed": true,
+          "evidence": "Numerator and denominator use [Total Sales]"
+        },
+        {
+          "text": "References only existing columns",
+          "passed": true,
+          "evidence": "All real columns"
+        },
+        {
+          "text": "Explains other slicers remain in filter context",
+          "passed": true,
+          "evidence": "Detailed explanation that year/country slicer reduces both consistently"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 32.7333,
+        "stddev": 3.581,
+        "min": 28.6,
+        "max": 34.9
+      },
+      "tokens": {
+        "mean": 19965.6667,
+        "stddev": 58.6202,
+        "min": 19905,
+        "max": 20022
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.9333,
+        "stddev": 0.1155,
+        "min": 0.8,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 23.9,
+        "stddev": 1.8028,
+        "min": 21.9,
+        "max": 25.4
+      },
+      "tokens": {
+        "mean": 13385.6667,
+        "stddev": 287.9172,
+        "min": 13188,
+        "max": 13716
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.07",
+      "time_seconds": "+8.8",
+      "tokens": "+6580"
+    }
+  },
+  "notes": []
+}

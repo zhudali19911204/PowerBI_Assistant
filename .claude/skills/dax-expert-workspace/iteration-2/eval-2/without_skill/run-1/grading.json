@@ -1,0 +1,42 @@
+{
+  "eval_name": "eval-2",
+  "configuration": "without_skill",
+  "summary": {
+    "passed": 5,
+    "failed": 1,
+    "total": 6,
+    "pass_rate": 0.833
+  },
+  "expectations": [
+    {
+      "text": "Averages MONTHLY totals, not daily fact rows",
+      "passed": true,
+      "evidence": "SUMMARIZE by Year+Month Number, ADDCOLUMNS [Gross Sales]"
+    },
+    {
+      "text": "Establishes a 3-month window at month grain",
+      "passed": true,
+      "evidence": "DATESINPERIOD(...,-3,MONTH)"
+    },
+    {
+      "text": "Builds on [Gross Sales]",
+      "passed": true,
+      "evidence": "[Gross Sales] per month"
+    },
+    {
+      "text": "Handles partial windows (divides by actual months, not always 3)",
+      "passed": true,
+      "evidence": "MonthsWithData = COUNTROWS(FILTER(NOT ISBLANK))"
+    },
+    {
+      "text": "References only existing columns",
+      "passed": true,
+      "evidence": "real columns"
+    },
+    {
+      "text": "Emits valid, compilable DAX (correct RETURN, balanced)",
+      "passed": false,
+      "evidence": "FATAL: uses 'RESULT =' instead of 'RETURN' before DIVIDE -- this measure will NOT compile in DAX"
+    }
+  ]
+}

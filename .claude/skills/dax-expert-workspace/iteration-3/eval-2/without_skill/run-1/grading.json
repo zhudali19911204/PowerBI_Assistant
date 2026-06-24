@@ -1,0 +1,42 @@
+{
+  "eval_name": "eval-2",
+  "configuration": "without_skill",
+  "summary": {
+    "passed": 5,
+    "failed": 1,
+    "total": 6,
+    "pass_rate": 0.833
+  },
+  "expectations": [
+    {
+      "text": "COGS = units sold * Product[Standard Cost] (SUMX with RELATED)",
+      "passed": true,
+      "evidence": "SUMX('Sales','Sales'[Units]*RELATED('Product'[Standard Cost]))"
+    },
+    {
+      "text": "Average inventory AVERAGED over days (semi-additive over time, not summed)",
+      "passed": false,
+      "evidence": "Subtle shared flaw: inner SUMX('Inventory',...) has no CALCULATE/measure wrapper, so AVERAGEX over days gets NO context transition -- each day sums the whole-period inventory, not that day's. Needs AVERAGEX(VALUES('Date'[Date]), CALCULATE(SUMX('Inventory',...))). Same defect in both configs; only live EVALUATE would catch it. (uses CALCULATETABLE(VALUES('Date'[Date]),'Inventory') for the day set, but inner SUMX still lacks transition)"
+    },
+    {
+      "text": "Inventory valued at Standard Cost in the daily aggregation",
+      "passed": true,
+      "evidence": "Units On Hand * RELATED('Product'[Standard Cost])"
+    },
+    {
+      "text": "DIVIDE for the turnover ratio",
+      "passed": true,
+      "evidence": "DIVIDE(_COGS, _AvgInventoryValue)"
+    },
+    {
+      "text": "Multiple VARs; only existing columns",
+      "passed": true,
+      "evidence": "real columns"
+    },
+    {
+      "text": "Valid, compilable DAX",
+      "passed": true,
+      "evidence": "compiles"
+    }
+  ]
+}

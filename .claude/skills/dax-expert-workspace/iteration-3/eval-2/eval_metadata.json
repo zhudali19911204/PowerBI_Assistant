@@ -1,0 +1,13 @@
+{
+  "eval_id": 2,
+  "eval_name": "snapshot-inventory-turnover",
+  "prompt": "[Inventory Turnover] = COGS over the period / AVERAGE inventory value during the period. COGS = units sold * Product[Standard Cost]. Average inventory value = average across the days of the daily total (Units On Hand * Standard Cost). Retail-v2.",
+  "assertions": [
+    { "text": "COGS = units sold valued at Product[Standard Cost], e.g. SUMX('Sales', 'Sales'[Units] * RELATED('Product'[Standard Cost]))" },
+    { "text": "Average inventory is computed by AVERAGING over the days in the period (AVERAGEX over VALUES('Date'[Date])), i.e. semi-additive averaged over time, NOT summed across days" },
+    { "text": "Inventory is valued at Standard Cost (Units On Hand * 'Product'[Standard Cost]) inside the daily aggregation" },
+    { "text": "Uses DIVIDE for the turnover ratio" },
+    { "text": "Defines multiple VARs (COGS, average inventory) and references only existing columns" },
+    { "text": "Emits valid, compilable DAX" }
+  ]
+}

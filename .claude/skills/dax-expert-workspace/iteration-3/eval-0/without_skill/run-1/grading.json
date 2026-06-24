@@ -1,0 +1,42 @@
+{
+  "eval_name": "eval-0",
+  "configuration": "without_skill",
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "expectations": [
+    {
+      "text": "Uses NESTED iteration: outer over months, inner over days",
+      "passed": true,
+      "evidence": "Identical AVERAGEX/MAXX nesting"
+    },
+    {
+      "text": "Inner finds MAX daily Gross Sales within a month",
+      "passed": true,
+      "evidence": "MAXX(VALUES('Date'[Date]), [Gross Sales])"
+    },
+    {
+      "text": "Outer AVERAGEs the per-month peaks across months",
+      "passed": true,
+      "evidence": "AVERAGEX over VALUES('Date'[Year-Month])"
+    },
+    {
+      "text": "Context transition re-evaluates [Gross Sales] at day grain in inner iterator",
+      "passed": true,
+      "evidence": "[Gross Sales] transitions per day"
+    },
+    {
+      "text": "Builds on [Gross Sales]; only existing columns",
+      "passed": true,
+      "evidence": "reuses [Gross Sales]"
+    },
+    {
+      "text": "Valid, compilable DAX",
+      "passed": true,
+      "evidence": "clean. Same month-grain caveat as with_skill"
+    }
+  ]
+}

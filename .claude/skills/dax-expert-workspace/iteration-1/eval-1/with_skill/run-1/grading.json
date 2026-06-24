@@ -1,0 +1,40 @@
+{
+  "eval_name": "optimize-slow-measure",
+  "configuration": "with_skill",
+  "passed": 5,
+  "total": 5,
+  "pass_rate": 1.0,
+  "expectations": [
+    {
+      "text": "Replaces whole-table FILTER(...) with column predicate 'Customer'[Country] = \"United States\"",
+      "passed": true,
+      "evidence": "CALCULATE(SUM(Sales[Quantity]), 'Customer'[Country] = \"United States\")"
+    },
+    {
+      "text": "Uses DIVIDE instead of / AND removes the redundant IF divide-by-zero guard",
+      "passed": true,
+      "evidence": "Dropped the IF guard entirely; RETURN DIVIDE(_usQuantity, _usNetAmount). Explicitly explains DIVIDE makes the >0 guard unnecessary"
+    },
+    {
+      "text": "Stores repeated CALCULATE subexpression in VAR (computed once)",
+      "passed": true,
+      "evidence": "_usQuantity / _usNetAmount VARs; notes original evaluated NetAmount twice"
+    },
+    {
+      "text": "Lists what changed and why faster/safer",
+      "passed": true,
+      "evidence": "4 bullets tagged (real performance / safety) with reasoning"
+    },
+    {
+      "text": "References only existing columns",
+      "passed": true,
+      "evidence": "Sales[Quantity], Sales[NetAmount], 'Customer'[Country]"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

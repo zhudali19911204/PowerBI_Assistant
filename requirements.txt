@@ -1,0 +1,26 @@
+# --- Core runtime ---
+streamlit>=1.36
+pydantic-settings>=2.3
+python-dotenv>=1.0
+anthropic>=0.40
+pandas>=2.2
+# Verify TLS against the OS trust store so requests work behind corporate SSL-inspection proxies
+# (whose private root CA the OS trusts but certifi doesn't). See powerbi_ai_assistant/net.py.
+truststore>=0.9
+# Live Power BI Desktop model read: load PBI's bundled ADOMD client and query TMSCHEMA DMVs.
+# Windows-only; the model must be open in Desktop. See powerbi_ai_assistant/context/live_source.py.
+pythonnet>=3.0 ; sys_platform == "win32"
+
+# OpenAI-compatible provider (optional)
+openai>=1.40
+
+# --- Live EVALUATE validation (M6) ---
+# Requires .NET + ADOMD.NET on Windows. Uncomment when wiring up live validation.
+# pyadomd>=0.1.1
+# pythonnet>=3.0
+
+# --- Dev ---
+pytest>=8.0
+ruff>=0.5
+black>=24.0
+mypy>=1.10

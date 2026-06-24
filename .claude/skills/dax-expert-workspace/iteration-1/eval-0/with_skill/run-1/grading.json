@@ -1,0 +1,45 @@
+{
+  "eval_name": "generate-yoy-growth",
+  "configuration": "with_skill",
+  "passed": 6,
+  "total": 6,
+  "pass_rate": 1.0,
+  "expectations": [
+    {
+      "text": "Builds on the existing [Total Sales] measure",
+      "passed": true,
+      "evidence": "VAR _currentSales = [Total Sales]; prior year via CALCULATE([Total Sales], ...)"
+    },
+    {
+      "text": "Uses DIVIDE for the percentage rather than /",
+      "passed": true,
+      "evidence": "RETURN DIVIDE(_currentSales - _priorYearSales, _priorYearSales)"
+    },
+    {
+      "text": "Uses SAMEPERIODLASTYEAR/DATEADD on 'Date'[Date]",
+      "passed": true,
+      "evidence": "CALCULATE([Total Sales], SAMEPERIODLASTYEAR('Date'[Date]))"
+    },
+    {
+      "text": "Uses VAR to capture current/prior value",
+      "passed": true,
+      "evidence": "Two VARs: _currentSales, _priorYearSales"
+    },
+    {
+      "text": "References only existing tables/columns",
+      "passed": true,
+      "evidence": "Only [Total Sales] and 'Date'[Date] used"
+    },
+    {
+      "text": "Notes reliance on the marked Date table",
+      "passed": true,
+      "evidence": "Assumptions: 'Date' marked as a Date table, contiguous days, required for SAMEPERIODLASTYEAR"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  }
+}

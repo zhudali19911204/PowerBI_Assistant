@@ -1,0 +1,42 @@
+{
+  "eval_name": "eval-1",
+  "configuration": "with_skill",
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "expectations": [
+    {
+      "text": "Iterates customer dimension with VALUES('Customer'[Customer ID])",
+      "passed": true,
+      "evidence": "ADDCOLUMNS(VALUES('Customer'[Customer ID]),...)"
+    },
+    {
+      "text": "Relies on context transition: [Gross Sales] inside iterator per customer",
+      "passed": true,
+      "evidence": "'@CustGross', [Gross Sales] inside ADDCOLUMNS row context"
+    },
+    {
+      "text": "Threshold via AVERAGEX over customers (not flat AVERAGE of rows)",
+      "passed": true,
+      "evidence": "AVERAGEX(_customers, [@CustGross])"
+    },
+    {
+      "text": "Freezes the average in a VAR before counting",
+      "passed": true,
+      "evidence": "VAR _avgGross = AVERAGEX(...)"
+    },
+    {
+      "text": "Counts customers above threshold via COUNTROWS(FILTER(...))",
+      "passed": true,
+      "evidence": "COUNTROWS(FILTER(_customers, [@CustGross] > _avgGross))"
+    },
+    {
+      "text": "References only existing columns",
+      "passed": true,
+      "evidence": "all real"
+    }
+  ]
+}

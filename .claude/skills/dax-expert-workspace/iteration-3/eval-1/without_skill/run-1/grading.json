@@ -1,0 +1,42 @@
+{
+  "eval_name": "eval-1",
+  "configuration": "without_skill",
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "expectations": [
+    {
+      "text": "Denominator via ALLSELECTED on product, slicers respected, per-row product filter lifted",
+      "passed": true,
+      "evidence": "Uses CALCULATETABLE(...,REMOVEFILTERS('Product'[Product Name])) -- achieves same goal (per-row lifted, Year/Region/Category kept); differs from ALLSELECTED only if a Product-Name slicer exists"
+    },
+    {
+      "text": "Virtual product table with [Gross Sales] via context transition",
+      "passed": true,
+      "evidence": "ADDCOLUMNS(VALUES('Product'[Product Name]), '@Sales', [Gross Sales])"
+    },
+    {
+      "text": "Cumulative = sum of sales for products with sales >= current (threshold logic)",
+      "passed": true,
+      "evidence": "SUMX(FILTER(AllProducts, [@Sales] >= CurrentProductSales), [@Sales])"
+    },
+    {
+      "text": "Captures current product's Gross Sales in a VAR (threshold)",
+      "passed": true,
+      "evidence": "VAR CurrentProductSales = [Gross Sales]"
+    },
+    {
+      "text": "DIVIDE + multiple VARs",
+      "passed": true,
+      "evidence": "4 VARs; DIVIDE(CumulativeSales, TotalSales)"
+    },
+    {
+      "text": "Only existing columns; valid DAX",
+      "passed": true,
+      "evidence": "valid; real columns"
+    }
+  ]
+}

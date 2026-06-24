@@ -1,0 +1,42 @@
+{
+  "eval_name": "eval-3",
+  "configuration": "with_skill",
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "expectations": [
+    {
+      "text": "Distinct customers active in current period",
+      "passed": true,
+      "evidence": "VAR _currentMonthCustomers = VALUES(Sales[Customer ID])"
+    },
+    {
+      "text": "Distinct customers active in PRIOR month via shifted date context",
+      "passed": true,
+      "evidence": "CALCULATETABLE(VALUES(Sales[Customer ID]), PREVIOUSMONTH('Date'[Date]))"
+    },
+    {
+      "text": "Intersects the two customer sets",
+      "passed": true,
+      "evidence": "INTERSECT(_currentMonthCustomers, _priorMonthCustomers)"
+    },
+    {
+      "text": "COUNTROWS + DIVIDE by prior-month active count for rate",
+      "passed": true,
+      "evidence": "COUNTROWS(_retained); DIVIDE([Retained Customers], _priorMonthActive)"
+    },
+    {
+      "text": "Multiple VARs; only existing columns",
+      "passed": true,
+      "evidence": "3 VARs; real columns"
+    },
+    {
+      "text": "Valid, compilable DAX",
+      "passed": true,
+      "evidence": "both measures valid"
+    }
+  ]
+}

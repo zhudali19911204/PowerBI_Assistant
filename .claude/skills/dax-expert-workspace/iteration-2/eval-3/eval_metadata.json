@@ -1,0 +1,12 @@
+{
+  "eval_id": 3,
+  "eval_name": "closing-inventory-semi-additive",
+  "prompt": "Closing Inventory = Units On Hand at the last date of the current period, summed across products/stores in context, without double-counting across days. Grounded in Retail-v2 (daily Inventory snapshot).",
+  "assertions": [
+    { "text": "Recognizes the value is semi-additive over time: takes the LAST available date's snapshot rather than summing across all days in the period" },
+    { "text": "Uses LASTDATE / LASTNONBLANK (e.g. CALCULATE(SUM('Inventory'[Units On Hand]), LASTDATE('Date'[Date])) or LASTNONBLANK on the snapshot date)" },
+    { "text": "Sums Units On Hand across products and stores at that last date (additive across non-time dimensions)" },
+    { "text": "References only existing columns ('Inventory'[Units On Hand], 'Date'[Date], snapshot date)" },
+    { "text": "Explains why a plain SUM over the whole period double-counts (each day re-states the on-hand balance)" }
+  ]
+}

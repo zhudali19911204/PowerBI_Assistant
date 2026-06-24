@@ -1,0 +1,13 @@
+{
+  "eval_id": 3,
+  "eval_name": "retention-month-over-month",
+  "prompt": "[Retained Customers] = customers who purchased in the selected month AND also in the immediately preceding month; plus [Retention Rate] = retained / customers active in the prior month. Retail-v2.",
+  "assertions": [
+    { "text": "Gets the distinct set of customers active in the current period (e.g. VALUES('Customer'[Customer ID]) constrained to rows with sales, or CALCULATETABLE of customers with sales)" },
+    { "text": "Gets the distinct customers active in the PRIOR month via a shifted date context (DATEADD(...,-1,MONTH) or PREVIOUSMONTH inside CALCULATETABLE)" },
+    { "text": "Intersects the two customer sets to find retained customers (INTERSECT, or FILTER ... IN / COUNTROWS over the intersection)" },
+    { "text": "Counts retained with COUNTROWS and computes the rate with DIVIDE over the prior-month active count" },
+    { "text": "Uses multiple VARs to hold the current-set, prior-set, and counts; references only existing columns" },
+    { "text": "Emits valid, compilable DAX" }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "eval_name": "eval-3",
+  "configuration": "with_skill",
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "expectations": [
+    {
+      "text": "Recognizes semi-additive: take LAST date, not SUM over all days",
+      "passed": true,
+      "evidence": "'must not be added up across the days of a period'"
+    },
+    {
+      "text": "Uses LASTDATE/LASTNONBLANK",
+      "passed": true,
+      "evidence": "LASTNONBLANK('Date'[Date], CALCULATE(COUNTROWS(Inventory)))"
+    },
+    {
+      "text": "Sums Units On Hand across products/stores at last date",
+      "passed": true,
+      "evidence": "SUM(Inventory[Units On Hand]) at the single closing date"
+    },
+    {
+      "text": "References only existing columns",
+      "passed": true,
+      "evidence": "Inventory[Units On Hand], 'Date'[Date]"
+    },
+    {
+      "text": "Explains why a plain SUM over the period double-counts",
+      "passed": true,
+      "evidence": "'would count the same stock many times'"
+    }
+  ]
+}

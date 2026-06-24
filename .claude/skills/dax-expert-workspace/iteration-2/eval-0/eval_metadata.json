@@ -1,0 +1,12 @@
+{
+  "eval_id": 0,
+  "eval_name": "net-sales-after-returns",
+  "prompt": "Net Sales = gross sales minus value of returned units; Returns is a separate table with only Units Returned, price each returned unit at the original sale line's discounted price. Grounded in Retail-v2.",
+  "assertions": [
+    { "text": "Computes the gross part from [Gross Sales] or an equivalent correct Units*Unit Price*(1-Discount) expression" },
+    { "text": "Values returns by pricing each returned unit via the Returns -> Sales relationship: RELATED('Sales'[Unit Price]) * (1 - RELATED('Sales'[Discount Pct])), iterating 'Returns' with SUMX" },
+    { "text": "Subtracts the returned value from gross sales to produce net" },
+    { "text": "Does NOT invent non-existent columns (e.g. 'Sales'[Sales Amount], a price/amount column on 'Returns', or 'Returns'[Unit Price])" },
+    { "text": "Notes that Returns has no price column, so the price must come from the related Sales line" }
+  ]
+}
