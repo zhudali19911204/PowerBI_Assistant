@@ -29,13 +29,14 @@ _THEME_CSS = """
 html, body, [data-testid="stAppViewContainer"], .stMarkdown, p, span, label, div {
   font-family:var(--font-body);
 }
-[data-testid="stAppViewContainer"]{ background:var(--paper); color:var(--ink); }
+/* base colors come from the Streamlit theme (config.toml) so light AND dark both stay readable;
+   we only layer fonts/accent/shape on top. */
 [data-testid="stHeader"]{ background:transparent; }
-.block-container{ padding-top:2.2rem; max-width:1180px; }
-h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:var(--ink); }
+.block-container{ padding-top:1rem; max-width:1180px; }
+h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:inherit; }
 
 /* sidebar — keep the collapse control but kill the big default top gap above our header */
-[data-testid="stSidebar"]{ background:var(--surface); border-right:1px solid var(--border); }
+[data-testid="stSidebar"]{ border-right:1px solid var(--border); }
 [data-testid="stSidebar"] [data-testid="stSidebarHeader"]{ padding-top:.3rem!important; padding-bottom:0!important; min-height:0!important; height:auto!important; }
 [data-testid="stSidebar"] [data-testid="stSidebarContent"]{ padding-top:0!important; }
 [data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{ padding-top:.2rem!important; }
@@ -52,7 +53,7 @@ h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:var(-
   content:""; position:absolute; left:7px; bottom:6px; width:4px; height:8px; border-radius:1px;
   background:#1B1F2A; box-shadow:6px 0 0 #1B1F2A, 3px -3px 0 #1B1F2A; opacity:.85;  /* tiny bar-chart glyph */
 }
-.brand .name{ font-family:var(--font-display); font-weight:600; font-size:.98rem; color:var(--ink); line-height:1; }
+.brand .name{ font-family:var(--font-display); font-weight:600; font-size:.98rem; color:inherit; line-height:1; }
 .brand .name b{ color:var(--accent); font-weight:700; }
 .brand-rule{ height:1px; background:linear-gradient(90deg,var(--accent) 0%,var(--border) 38%); margin:.55rem 0 .2rem; }
 
@@ -60,7 +61,7 @@ h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:var(-
 .readout{ display:flex; flex-direction:column; gap:.2rem; margin:.45rem 0 .1rem; }
 .readout .row{ display:flex; align-items:baseline; justify-content:space-between; gap:.7rem; font-size:.78rem; }
 .readout .row > span{ color:var(--muted); letter-spacing:.02em; flex:0 0 auto; }
-.readout .row > b{ font-weight:500; color:var(--ink-2); text-align:right; word-break:break-all; }
+.readout .row > b{ font-weight:500; color:inherit; opacity:.85; text-align:right; word-break:break-all; }
 .readout .row > b.mono{ font-family:var(--font-mono); font-size:.73rem; }
 .readout .row > b.ok{ color:var(--ok); }
 .readout .row > b.warn{ color:var(--accent); }
@@ -84,26 +85,32 @@ h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:var(-
 /* ---- buttons ---- */
 .stButton>button{
   border-radius:10px; font-weight:500; font-family:var(--font-body);
-  border:1px solid var(--border); background:var(--surface); color:var(--ink-2);
+  border:1px solid var(--border);
   transition:border-color .15s, color .15s, background .15s, transform .04s;
 }
-.stButton>button:hover{ border-color:var(--ink); color:var(--ink); }
+.stButton>button:hover{ border-color:var(--accent); color:var(--accent); }
 .stButton>button:active{ transform:translateY(1px); }
 .stButton>button[kind="primary"], [data-testid="stBaseButton-primary"]{
-  background:var(--ink); color:#fff; border:1px solid var(--ink);
+  background:var(--accent)!important; color:#1B1F2A!important; border:1px solid var(--accent)!important;
 }
 .stButton>button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover{
-  background:#0F1320; border-color:#0F1320; color:#fff;
+  background:var(--accent-2)!important; border-color:var(--accent-2)!important; color:#1B1F2A!important;
 }
+/* sidebar settings gear: bigger, centered glyph, square */
+.st-key-ui_gear_btn button{
+  padding:.35rem 0!important; min-height:2.6rem;
+  display:flex; align-items:center; justify-content:center;
+}
+.st-key-ui_gear_btn button p{ font-size:1.4rem!important; line-height:1; margin:0; }
 
-/* inputs — white fill + a clear border so the box stands out from the paper background */
+/* inputs — keep a clear border so the box stands out; fill/text follow the theme (light or dark) */
 [data-testid="stTextArea"] [data-baseweb="textarea"],
 [data-testid="stTextInput"] [data-baseweb="input"],
 [data-testid="stTextInput"] [data-baseweb="base-input"]{
-  background:var(--surface)!important; border:1.5px solid #C9CFDA!important; border-radius:10px!important;
+  border:1.5px solid var(--accent)!important; border-radius:10px!important; border-color:#C9CFDA!important;
 }
 [data-testid="stTextArea"] textarea, [data-testid="stTextInput"] input{
-  background:transparent!important; font-family:var(--font-body); color:var(--ink);
+  background:transparent!important; font-family:var(--font-body);
 }
 [data-testid="stTextArea"] [data-baseweb="textarea"]:focus-within,
 [data-testid="stTextInput"] [data-baseweb="input"]:focus-within,
@@ -111,12 +118,33 @@ h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:var(-
   border-color:var(--accent)!important; box-shadow:0 0 0 3px var(--accent-tint)!important;
 }
 
+/* chat input — clear border so the box stands out; fill follows the theme */
+[data-testid="stChatInput"]{
+  border:1.5px solid #C9CFDA!important; border-radius:12px!important;
+}
+[data-testid="stChatInput"]:focus-within{
+  border-color:var(--accent)!important; box-shadow:0 0 0 3px var(--accent-tint)!important;
+}
+[data-testid="stChatInput"] textarea{ background:transparent!important; }
+
+/* Top controls and bottom composer are kept frozen by construction — the chat history sits in a
+   fixed-height scroll box between them (see components._render_dax_chat), so neither moves. These rules
+   are just light separators. */
+.st-key-dax_topbar{ padding:.2rem 0 .4rem; border-bottom:1px solid var(--border); margin-bottom:.3rem; }
+.st-key-dax_composer{ padding:.5rem 0 .2rem; }
+/* the inline send icon — gold square that reads as the send affordance */
+.st-key-dax_send_btn button{
+  background:var(--accent)!important; border:1px solid var(--accent)!important; color:#1B1F2A!important;
+  border-radius:10px!important; padding:.45rem 0!important;
+}
+.st-key-dax_send_btn button:hover{ background:var(--accent-2)!important; border-color:var(--accent-2)!important; }
+
 /* code blocks → monospace data surface */
 [data-testid="stCode"], pre{ border-radius:10px!important; border:1px solid var(--border)!important; }
 code, kbd, pre, [data-testid="stCode"] *{ font-family:var(--font-mono)!important; }
 
 /* expanders */
-[data-testid="stExpander"]{ border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+[data-testid="stExpander"]{ border:1px solid var(--border); border-radius:10px; }
 [data-testid="stExpander"] summary{ font-weight:500; }
 
 /* alerts: rounded with a left accent rule */
@@ -132,7 +160,7 @@ hr{ margin:.8rem 0; border-color:var(--border-2); }
 
 
 def inject_theme() -> None:
-    """Inject the global stylesheet. Call once, right after st.set_page_config."""
+    """Inject the global stylesheet. Call once, right after st.set_page_config. The app is light-only."""
     st.markdown(_THEME_CSS, unsafe_allow_html=True)
 
 

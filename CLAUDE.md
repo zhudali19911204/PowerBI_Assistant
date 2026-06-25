@@ -32,6 +32,13 @@ AI 辅助 Power BI 四大痛点（数据清洗 / 建模 / **DAX** / 仪表盘）
 - DAX prompts：[powerbi_ai_assistant/dax/prompts.py](powerbi_ai_assistant/dax/prompts.py)
 - 评测脚手架：`.claude/skills/dax-expert-workspace/`
 
+## Memory 双向同步
+- 项目有两份 memory，必须**始终保持一致**：
+  - 用户级：`C:\Users\uic89469\.claude\projects\e--AI-Project-PowerBI-AI-Assistant\memory\`（会话自动加载）
+  - 项目级：`e:\AI_Project\PowerBI_AI_Assistant\memory\`（随仓库走）
+- **每次新增/修改/删除任一处的 memory（含 `MEMORY.md` 索引），都要同步到另一处**，确保文件清单与内容完全一致。
+- 同步后用 `diff` 核对清单与逐文件内容，确认无差异再算完成。
+
 ## 通用规则（自定义 — 待补充）
 <!-- 在下面追加你的规则，例如命名规范、提交信息格式、禁止事项等 -->
 - 

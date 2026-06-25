@@ -13,12 +13,28 @@ of calibrated generation: compare the value at a slice the user knows the correc
 from __future__ import annotations
 
 import datetime
+import re
 from typing import Any
 
 from ..context.live_source import _LiveSession, find_adomd_dll, find_instances
 from ..core.artifact import ValidationResult
 
 _PROBE = "__pbi_ai_probe"
+
+# Functions that return a TABLE — if an expression starts with one, it's a calculated table, not a
+# scalar measure, and must be validated/written differently.
+_TABLE_FUNCS = (
+    "CALENDAR", "CALENDARAUTO", "ADDCOLUMNS", "SUMMARIZE", "SUMMARIZECOLUMNS", "SELECTCOLUMNS",
+    "FILTER", "ALL", "ALLNOBLANKROW", "ALLSELECTED", "ALLEXCEPT", "VALUES", "DISTINCT", "DATATABLE",
+    "GENERATESERIES", "GENERATE", "GENERATEALL", "UNION", "EXCEPT", "INTERSECT", "CROSSJOIN", "NATURALINNERJOIN",
+    "NATURALLEFTOUTERJOIN", "TOPN", "GROUPBY", "TREATAS", "ROW", "CALCULATETABLE", "RELATEDTABLE",
+)
+_TABLE_RE = re.compile(r"^\s*(?:VAR\b.*\bRETURN\s+)?(" + "|".join(_TABLE_FUNCS) + r")\s*\(", re.IGNORECASE | re.DOTALL)
+
+
+def is_table_expression(expression: str) -> bool:
+    """Heuristic: does this DAX expression return a TABLE (calculated table) rather than a scalar?"""
+    return bool(_TABLE_RE.match(expression))
 
 # A single slice predicate: (table, column, value). Value is a real Python value from the engine.
 SliceFilter = tuple[str, str, Any]
@@ -28,6 +44,32 @@ def _clean_error(exc: Exception) -> str:
     """The first, most meaningful line of an ADOMD/.NET exception message."""
     text = str(exc).strip()
     return text.splitlines()[0][:300] if text else type(exc).__name__
+
+
+def _is_syntax_error(vr: ValidationResult) -> bool:
+    """A hard parse error (bad DAX) vs a merely-unresolved reference (which siblings can fix)."""
+    return any("invalid token" in e.lower() or "syntax error" in e.lower() for e in vr.errors)
+
+
+def validate_measure_set(
+    evaluator: "LiveDesktopEvaluator", home_table: str, measures: list[tuple[str, str]]
+) -> list[ValidationResult]:
+    """Validate each measure of a set, isolating syntactically-broken ones so they don't fail the others.
+
+    A measure that only fails because it references a sibling is retried with all *non-broken* siblings
+    DEFINE-d; a measure with its own syntax error keeps that error and is excluded from others' DEFINE set.
+    """
+    alone = [evaluator.evaluate_with_defines(home_table, [m], m[0]) for m in measures]
+    broken = {measures[i][0] for i, vr in enumerate(alone) if not vr.ok and _is_syntax_error(vr)}
+    good = [m for m in measures if m[0] not in broken]
+
+    results: list[ValidationResult] = []
+    for i, (name, _expr) in enumerate(measures):
+        if alone[i].ok or name in broken:
+            results.append(alone[i])  # passed standalone, or genuinely broken — keep its own result
+        else:
+            results.append(evaluator.evaluate_with_defines(home_table, good, name))  # needed siblings
+    return results
 
 
 def _format_value(value: Any) -> str:
@@ -65,6 +107,44 @@ class LiveDesktopEvaluator:
         else:
             value_expr = f"[{_PROBE}]"
         return self._run(expression, home_table, value_expr)
+
+    def evaluate_with_defines(
+        self, home_table: str, defines: list[tuple[str, str]], target_name: str
+    ) -> ValidationResult:
+        """Evaluate one measure of a set, DEFINE-ing all of them so cross-references (base→derived) resolve.
+
+        `defines` is [(name, expression)] for every measure in the block; `target_name` is the one to read.
+        """
+        if not self.dll:
+            return ValidationResult(
+                ok=False, errors=["未找到 Power BI 的 ADOMD 客户端 DLL，无法实跑验证"], run_verified=False
+            )
+        define_lines = "\n".join(f"  MEASURE '{home_table}'[{name}] = {expr}" for name, expr in defines)
+        dax = f'DEFINE\n{define_lines}\nEVALUATE ROW("value", [{target_name}])'
+        try:
+            with _LiveSession(self.port, self.dll) as session:
+                rows = session.query(dax)
+        except Exception as exc:  # noqa: BLE001
+            return ValidationResult(ok=False, errors=[_clean_error(exc)], run_verified=True)
+        value = next(iter(rows[0].values()), None) if rows else None
+        return ValidationResult(ok=True, sample=value, run_verified=True)
+
+    def evaluate_table_expr(self, expression: str) -> ValidationResult:
+        """Validate a calculated-table expression by running `EVALUATE` on it (capped). Reports the
+        shape (rows × cols) on success, or the engine's error — `run_verified` either way."""
+        if not self.dll:
+            return ValidationResult(
+                ok=False, errors=["未找到 Power BI 的 ADOMD 客户端 DLL，无法实跑验证"], run_verified=False
+            )
+        try:
+            with _LiveSession(self.port, self.dll) as session:
+                rows = session.query(f"EVALUATE TOPN ( 50, {expression} )")
+        except Exception as exc:  # noqa: BLE001
+            return ValidationResult(ok=False, errors=[_clean_error(exc)], run_verified=True)
+        ncols = len(rows[0]) if rows else 0
+        nrows = len(rows)
+        shape = f"{nrows}{'+' if nrows >= 50 else ''} 行 × {ncols} 列"
+        return ValidationResult(ok=True, sample=shape, run_verified=True)
 
     def _run(self, expression: str, home_table: str, value_expr: str) -> ValidationResult:
         if not self.dll:

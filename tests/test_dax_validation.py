@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from powerbi_ai_assistant.context import Column, Measure, ModelContext
 from powerbi_ai_assistant.core import ActionRequest, ValidationResult
-from powerbi_ai_assistant.dax import GenerateAction, measure_expression
+from powerbi_ai_assistant.dax import (
+    GenerateAction,
+    is_table_expression,
+    measure_expression,
+    validate_measure_set,
+)
 from powerbi_ai_assistant.llm.base import ChatMessage
 
 
@@ -49,6 +54,42 @@ class SeqEvaluator:
 
 
 # ----------------------------------------------------------------------- measure_expression
+
+class DefEvaluator:
+    """Fake set-evaluator: each measure is 'ok', 'syntax' (broken), or 'needs:<sibling>'."""
+
+    def __init__(self, behavior: dict):
+        self.behavior = behavior
+
+    def evaluate_with_defines(self, home, defines, target):
+        defined = {n for n, _ in defines}
+        b = self.behavior[target]
+        if b == "syntax":
+            return ValidationResult(ok=False, errors=["Invalid token, Line 1, 当"], run_verified=True)
+        if b.startswith("needs:"):
+            need = b.split(":", 1)[1]
+            if need in defined:
+                return ValidationResult(ok=True, sample=1, run_verified=True)
+            return ValidationResult(ok=False, errors=["Cannot find measure"], run_verified=True)
+        return ValidationResult(ok=True, sample=1, run_verified=True)
+
+
+def test_validate_measure_set_isolates_broken_measure():
+    measures = [("A", "1"), ("B_broken", "VAR 当=1 RETURN 当"), ("C_needs_A", "[A]")]
+    ev = DefEvaluator({"A": "ok", "B_broken": "syntax", "C_needs_A": "needs:A"})
+    results = validate_measure_set(ev, "T", measures)
+    assert results[0].ok                       # A passes alone
+    assert not results[1].ok                   # B is genuinely broken (syntax)
+    assert results[2].ok                       # C passes — broken B is excluded from its DEFINE set
+
+
+def test_is_table_expression():
+    assert is_table_expression("CALENDAR ( DATE(2024,1,1), DATE(2024,12,31) )")
+    assert is_table_expression("ADDCOLUMNS ( CALENDARAUTO(), \"Year\", YEAR([Date]) )")
+    assert is_table_expression("SUMMARIZE ( Sales, Sales[Region] )")
+    assert not is_table_expression("SUM ( Sales[Amount] )")
+    assert not is_table_expression("DIVIDE ( [a], [b] )")
+
 
 def test_measure_expression_strips_name():
     assert measure_expression("Total = SUM ( Sales[Amount] )", "Total") == "SUM ( Sales[Amount] )"

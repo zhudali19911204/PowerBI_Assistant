@@ -1,0 +1,16 @@
+# App-level Streamlit config. The UI ships a hand-tuned light "engineering workbench" theme
+# (app/theme.py). We set it as the DEFAULT here so new users / "System" land on it. The injected CSS no
+# longer hard-forces backgrounds/text colors, so Streamlit's own theme engine drives base colors — that
+# keeps the app readable in BOTH the light default and the menu's Dark option (our CSS only adds fonts,
+# the gold accent, and component shapes on top).
+
+[theme]
+base = "light"
+primaryColor = "#E0A400"            # Power BI gold accent
+backgroundColor = "#F4F5F7"         # --paper
+secondaryBackgroundColor = "#FFFFFF" # --surface (sidebar, inputs, cards)
+textColor = "#1B1F2A"               # --ink
+borderColor = "#E5E8EE"             # --border
+
+[browser]
+gatherUsageStats = false

@@ -22,7 +22,7 @@ from powerbi_ai_assistant.app.components import (
     render_model_source_sidebar,
     render_settings_entry,
 )
-from powerbi_ai_assistant.app.theme import hero, inject_theme
+from powerbi_ai_assistant.app.theme import inject_theme
 
 st.set_page_config(page_title="PowerBI AI Assistant", page_icon="📊", layout="wide")
 inject_theme()
@@ -35,8 +35,4 @@ cfg = render_settings_entry()
 ctx = render_model_source_sidebar()
 
 # Main pane.
-hero()
 render_capabilities(cfg, ctx)
-
-st.divider()
-st.caption("方案：docs/DEVELOPMENT_PLAN.md ｜ 规则：CLAUDE.md")

@@ -2,19 +2,33 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import streamlit as st
 
-from ..context import DesktopInstance, LiveDesktopSource, ModelContext, find_instances
-from ..core import ActionRequest, registry
+from ..context import (
+    DesktopInstance,
+    LiveDesktopSource,
+    LiveDesktopWriter,
+    ModelContext,
+    find_instances,
+)
+from ..core import registry
 from ..core.capability import Capability
 from ..dax import (
     CalibrationSession,
     DaxCapability,
     LiveDesktopEvaluator,
     advance,
+    has_dax_block,
+    is_table_expression,
+    parse_measure_response,
     slice_desc,
+    split_measures,
+    validate_measure_set,
 )
-from ..llm import build_provider, user
+from ..dax.prompts import build_chat_system_prompt
+from ..llm import ChatMessage, build_provider, user
 from ..runtime_config import (
     PRESET_BY_KEY,
     PROVIDER_PRESETS,
@@ -43,7 +57,7 @@ def render_settings_entry() -> RuntimeConfig:
         with col_brand:
             brand_header()
         with col_gear:
-            if st.button("⚙️", help="模型设置"):
+            if st.button("⚙️", key="ui_gear_btn", help="模型设置"):
                 _settings_dialog()
         label = PRESET_BY_KEY[cfg.preset].label if cfg.preset in PRESET_BY_KEY else cfg.preset
         model_readout(label, cfg.model, bool(cfg.api_key))
@@ -250,12 +264,17 @@ def _render_capability(cap: Capability, cfg: RuntimeConfig, ctx: ModelContext | 
 
     for action in cap.actions():
         if action.id == "generate":
-            mode = st.radio(
-                "生成模式", ["⚡ 快速生成", "🎯 校准式生成"],
-                horizontal=True, key="dax_mode", label_visibility="collapsed",
-            )
-            if mode.startswith("⚡"):
-                _render_dax_generate(action, cfg, ctx)
+            # Mode switch + chat toggles live in a keyed container that theme.py pins to the top
+            # (`st-key-dax_topbar`), so they stay put while the chat history scrolls underneath.
+            with st.container(key="dax_topbar"):
+                mode = st.radio(
+                    "生成模式", ["💬 AI 对话", "🎯 校准式生成"],
+                    horizontal=True, key="dax_mode", label_visibility="collapsed",
+                )
+                chat_toggles = _render_chat_toggles() if mode.startswith("💬") else None
+            if mode.startswith("💬"):
+                assert chat_toggles is not None
+                _render_dax_chat(cfg, ctx, *chat_toggles)
             else:
                 _render_dax_calibrate(cfg, ctx)
         else:
@@ -263,42 +282,156 @@ def _render_capability(cap: Capability, cfg: RuntimeConfig, ctx: ModelContext | 
             st.caption(f"（能力「{action.label}」将在后续里程碑接入）")
 
 
-def _render_dax_generate(action, cfg: RuntimeConfig, ctx: ModelContext) -> None:
-    st.markdown("**用自然语言描述你要的度量值**，AI 会基于上方真实模型结构生成 DAX。")
-    text = st.text_area(
-        "业务需求",
-        key="dax_gen_text",
-        placeholder="例如：按月计算销售额的同比增长率",
-        height=100,
-    )
-    # A connected live engine enables run-verification + the repair loop; without it, static-only.
+def _render_chat_toggles() -> tuple[bool, bool]:
+    """The chat's two toggles (write-back, deep-thinking), rendered inside the pinned top bar.
+    Returns (write_on, deep_think)."""
     port = st.session_state.get("model_ctx_port")
-    if port:
-        st.caption("🔌 已连实时引擎：生成的 DAX 会实跑 `EVALUATE` 验证，失败会自动修复。")
-    else:
-        st.caption("ⓘ 未连实时引擎：仅静态校验（不会实跑验证）。")
+    write_on = st.toggle(
+        "✍️ 写入 Power BI（开启后，验证通过的度量值可一键写入当前模型）",
+        value=st.session_state.get("chat_write_on", False),
+        key="chat_write_on", disabled=port is None,
+        help="会修改当前打开的模型；写入后请在 Desktop 按 Ctrl+S 保存。" if port else "需先连接 Power BI Desktop。",
+    )
+    deep_think = st.toggle(
+        "🧠 深度思考（更准但更慢）",
+        value=st.session_state.get("chat_deep_think", False),
+        key="chat_deep_think",
+        help="开启后让模型在作答前进行内部推理（如千问思考模式），适合复杂度量值；默认关闭以求快速响应。",
+    )
+    return write_on, deep_think
 
-    if st.button("生成 DAX", type="primary", disabled=not text.strip()):
-        try:
-            provider = build_provider(cfg)
-        except Exception as e:  # noqa: BLE001
-            st.error(f"无法初始化模型：{e}")
-            return
-        evaluator = LiveDesktopEvaluator(port) if port else None
-        try:
-            with st.spinner(f"{cfg.model} 正在生成并验证…"):
-                req = ActionRequest(text=text.strip(), context=ctx, provider=provider, evaluator=evaluator)
-                st.session_state.dax_result = action.run(req)
-        except ModuleNotFoundError as e:
-            st.error(f"缺少依赖：{e}. 运行 `pip install -r requirements.txt`")
-            return
-        except Exception as e:  # noqa: BLE001 — surface provider/auth/parse errors
-            st.error(f"生成失败：{type(e).__name__}: {e}")
-            return
 
-    result = st.session_state.get("dax_result")
-    if result is not None:
-        _render_dax_result(result)
+def _submit_chat() -> None:
+    """Composer submit callback (Enter or send icon): stash the trimmed text as the pending prompt and
+    clear the input box. Runs before widgets re-instantiate, so resetting `dax_gen_text` is allowed."""
+    text = str(st.session_state.get("dax_gen_text", "")).strip()
+    if text:
+        st.session_state["_chat_pending"] = text
+    st.session_state["dax_gen_text"] = ""
+
+
+def _render_dax_chat(cfg: RuntimeConfig, ctx: ModelContext, write_on: bool, deep_think: bool) -> None:
+    """A general grounded chat: ask anything, get reasoning + a measure, auto run-verified; with the write
+    toggle on, a validated measure can be written straight into the open Power BI model. The two toggles
+    are rendered by the pinned top bar (`_render_chat_toggles`) and passed in."""
+    port = st.session_state.get("model_ctx_port")
+
+    msgs: list[dict] = st.session_state.setdefault("chat_msgs", [])
+    # History lives in a fixed-height scroll box, so the top controls and the bottom composer stay put
+    # by construction — they're outside the scrolling region. Far more reliable than CSS sticky.
+    chat_box = st.container(height=620)
+    with chat_box:
+        for i, m in enumerate(msgs):
+            with st.chat_message(m["role"]):
+                st.markdown(m["content"])
+                if m["role"] == "assistant" and m.get("items"):
+                    _render_chat_items(i, m, ctx, port, write_on)
+
+    # A text_input composer (keyed `dax_gen_text`) so the sidebar field browser can insert
+    # 'Table'[Column] references into it. Enter (on_change) and the send icon (on_click) both go
+    # through `_submit_chat`, which stashes the text and clears the box — clearing the widget key is
+    # allowed inside a callback (it runs before the widget is re-instantiated). Wrapped in a keyed
+    # container (`st-key-dax_composer`) so theme.py can pin it to the bottom.
+    with st.container(key="dax_composer"):
+        c_in, c_btn = st.columns([20, 1], vertical_alignment="center")
+        with c_in:
+            st.text_input(
+                "消息", key="dax_gen_text", label_visibility="collapsed",
+                placeholder="问我任何 Power BI / DAX 问题…（左侧点字段可插入引用，回车发送）",
+                on_change=_submit_chat,
+            )
+        with c_btn:
+            st.button(":material/send:", key="dax_send_btn", on_click=_submit_chat,
+                      help="发送（也可按回车）", use_container_width=True)
+    prompt = st.session_state.pop("_chat_pending", None)
+    if prompt:
+        msgs.append({"role": "user", "content": prompt})
+        with chat_box:
+            st.chat_message("user").markdown(prompt)
+            assistant_box = st.chat_message("assistant")
+        with assistant_box:
+            try:
+                provider = build_provider(cfg)
+            except Exception as e:  # noqa: BLE001
+                st.error(f"无法初始化模型：{e}")
+                msgs.pop()  # drop the dangling user turn
+                return
+            system = build_chat_system_prompt(ctx.serialize_for_prompt())
+            history = [
+                ChatMessage(role=x["role"], content=x["content"]) for x in msgs[-12:]  # bound context
+            ]
+            try:
+                text = st.write_stream(provider.stream(
+                    system=system, messages=history, max_tokens=4000, enable_thinking=deep_think,
+                ))
+            except Exception as e:  # noqa: BLE001 — surface provider/auth/stream errors
+                st.error(f"生成失败：{type(e).__name__}: {e}")
+                msgs.pop()
+                return
+        entry: dict = {"role": "assistant", "content": str(text)}
+        # A reply may contain measures (scalar) AND/OR a calculated table (e.g. a date table). Split into
+        # items, classify each, and validate it the right way — a table via EVALUATE, a measure via the
+        # set-validator (which isolates a syntactically-broken sibling).
+        if has_dax_block(str(text)):
+            parts = split_measures(parse_measure_response(str(text)).code)
+            items: list[dict[str, Any]] = [
+                {"name": n, "expr": e, "kind": "table" if is_table_expression(e) else "measure"}
+                for n, e in parts
+            ]
+            if items:
+                entry["items"] = items
+                if port:
+                    home = next(iter(ctx.tables), "")
+                    evaluator = LiveDesktopEvaluator(port)
+                    scalars = [(it["name"], it["expr"]) for it in items if it["kind"] == "measure"]
+                    with st.spinner("实跑 EVALUATE 验证…"):
+                        scalar_vrs = dict(zip(
+                            [n for n, _ in scalars], validate_measure_set(evaluator, home, scalars)
+                        ))
+                        for it in items:
+                            it["validation"] = (
+                                evaluator.evaluate_table_expr(it["expr"]) if it["kind"] == "table"
+                                else scalar_vrs[it["name"]]
+                            )
+        msgs.append(entry)
+        st.rerun()
+
+
+def _render_chat_items(i: int, m: dict, ctx: ModelContext, port: int | None, write_on: bool) -> None:
+    """Render each generated object (measure or calculated table) with its run-verification and, when
+    writing is on, the matching write control."""
+    items: list[dict] = m["items"]
+    if len(items) > 1:
+        st.caption(f"本回复包含 {len(items)} 个对象：")
+
+    for j, it in enumerate(items):
+        name, expr, kind = it["name"], it["expr"], it["kind"]
+        vr = it.get("validation")
+        ok = bool(vr and vr.run_verified and vr.ok)
+        label = "计算表" if kind == "table" else "度量值"
+        st.markdown(f"**{label}：** `{name}`")
+        st.code(f"{name} = {expr}", language="dax")
+        if vr is not None:
+            if ok:
+                msg = f"✅ 实跑验证通过：返回 {vr.sample}" if kind == "table" else f"✅ 实跑验证通过：EVALUATE = {vr.sample}"
+                st.success(msg)
+            elif vr.run_verified:
+                st.error("❌ 实跑失败（引擎报错）：" + "；".join(vr.errors))
+        elif port is None:
+            st.caption("ⓘ 未连引擎，未实跑验证。")
+
+        if write_on and port and ok:
+            with st.expander(f"✍️ 写入「{name}」到模型", expanded=False):
+                wname = st.text_input("名称", value=name, key=f"wt_name_{i}_{j}")
+                if kind == "table":
+                    if st.button("写入计算表", key=f"wt_btn_{i}_{j}", type="primary", disabled=not wname.strip()):
+                        res = LiveDesktopWriter(port).write_calculated_table(wname.strip(), expr)
+                        (st.success if res.ok else st.error)(res.detail)
+                else:
+                    table = st.selectbox("目标表", list(ctx.tables), key=f"wt_tbl_{i}_{j}")
+                    if st.button("写入度量值", key=f"wt_btn_{i}_{j}", type="primary", disabled=not wname.strip()):
+                        res = LiveDesktopWriter(port).write_measure(table, wname.strip(), expr)
+                        (st.success if res.ok else st.error)(res.detail)
 
 
 # match rule label -> (rel_tol, abs_tol) for calibration hit detection
@@ -392,18 +525,16 @@ def _render_calibrate_thread(sess: CalibrationSession, cfg: RuntimeConfig, ctx: 
     st.divider()
     _render_calibrate_transcript(sess)
 
+    # Same chat box as the AI 对话 mode — bottom-anchored, submit on Enter.
     if sess.status == "asking":
-        reply = st.text_input("回答上面的问题以继续校准", key=f"cal_reply_{len(sess.transcript)}")
-        if st.button("回答并继续", type="primary", disabled=not reply.strip()):
+        reply = st.chat_input("回答上面的问题以继续校准…")
+        if reply and reply.strip():
             if _run_calibration(sess, cfg, ctx, port, user_reply=reply.strip()):
                 st.rerun()
     elif sess.status == "passed":
         st.success("✅ 已用你的标准值验证：上方度量值在此切片下算出的值与你给的正确值一致。")
-        refine = st.text_input(
-            "继续优化 / 调整（例如：用 DIVIDE、提升性能、加注释、改业务口径）",
-            key=f"cal_refine_{len(sess.transcript)}",
-        )
-        if st.button("提交优化", type="primary", disabled=not refine.strip()):
+        refine = st.chat_input("继续优化 / 调整（用 DIVIDE、提升性能、加注释、改口径…）")
+        if refine and refine.strip():
             if _run_calibration(sess, cfg, ctx, port, refine_request=refine.strip()):
                 st.rerun()
 
@@ -461,55 +592,6 @@ def _run_calibration(
         return False
     st.session_state.cal_session = sess
     return True
-
-
-def _render_dax_result(result) -> None:
-    st.divider()
-    artifacts = result.artifacts
-    if artifacts:
-        art = artifacts[0]
-        name = result.meta.get("measure_name") or ""
-        if name:
-            st.markdown(f"**度量值：** `{name}`")
-        st.code(art.content, language="dax")
-
-        vr = result.meta.get("validation")
-        if vr is not None:
-            _render_validation(vr)
-
-        repairs = result.meta.get("repairs") or []
-        if repairs:
-            with st.expander(f"🔧 自动修复了 {len(repairs)} 次（点击查看每轮的报错）", expanded=False):
-                for r in repairs:
-                    st.caption(f"第 {r['attempt']} 轮报错：" + "；".join(r.get("errors", [])))
-
-    if result.explanation:
-        with st.expander("AI 完整说明", expanded=False):
-            st.markdown(result.explanation)
-
-
-def _render_validation(vr) -> None:
-    """Render the validation outcome. Distinguish run-verified (real EVALUATE) from static-only —
-    never imply DAX was executed when it wasn't (run_verified=False)."""
-    if vr.run_verified:
-        if vr.ok:
-            st.success(f"✅ 实跑验证通过：`EVALUATE` 返回值 = {vr.sample}")
-        else:
-            for e in vr.errors:
-                st.error(f"❌ 实跑失败（引擎报错）：{e}")
-            st.caption("以上为 Power BI 引擎执行时的真实报错——这是最强的判错信号。")
-        for w in vr.warnings:
-            st.warning(f"⚠ {w}")
-        return
-
-    # static-only path (no live engine connected)
-    for e in vr.errors:
-        st.error(f"❌ {e}")
-    for w in vr.warnings:
-        st.warning(f"⚠ {w}")
-    if vr.ok and not vr.errors:
-        st.success("✅ 静态校验通过：引用的表/列均真实存在，括号平衡。")
-    st.caption("ⓘ 仅静态校验，**未经实跑验证**。在左侧连接 Power BI Desktop 后，生成会自动实跑 `EVALUATE` 验证。")
 
 
 def _test_connection(cfg: RuntimeConfig) -> None:

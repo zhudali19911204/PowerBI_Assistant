@@ -11,6 +11,7 @@ from powerbi_ai_assistant.dax import (
     DaxMeasureArtifact,
     GenerateAction,
     parse_measure_response,
+    split_measures,
 )
 from powerbi_ai_assistant.llm.base import ChatMessage
 
@@ -70,6 +71,24 @@ def test_parse_falls_back_to_untagged_fence():
 def test_parse_does_not_mistake_var_for_name():
     parsed = parse_measure_response("```dax\nVAR x = 1\nRETURN x\n```")
     assert parsed.name == ""
+
+
+def test_split_measures_handles_dividers_and_vars():
+    code = (
+        "==================== 1. 基础 ====================\n"
+        "销售额 = SUM ( Sales[Amount] )\n"
+        "成本 = SUM ( Sales[Cost] )\n"
+        "==================== 2. 派生 ====================\n"
+        "毛利 =\nVAR s = [销售额]\nRETURN s - [成本]"
+    )
+    ms = split_measures(code)
+    assert [n for n, _ in ms] == ["销售额", "成本", "毛利"]          # dividers dropped, 3 measures
+    assert ms[0][1] == "SUM ( Sales[Amount] )"
+    assert ms[2][1] == "VAR s = [销售额]\nRETURN s - [成本]"          # VAR/RETURN stay with their measure
+
+
+def test_split_measures_single():
+    assert split_measures("Total = SUM ( Sales[Amount] )") == [("Total", "SUM ( Sales[Amount] )")]
 
 
 # --------------------------------------------------------------------------- static validation

@@ -7,6 +7,7 @@ from .live_source import (
     find_adomd_dll,
     find_instances,
 )
+from .live_writer import LiveDesktopWriter, WriteResult
 
 __all__ = [
     "Column",
@@ -15,6 +16,8 @@ __all__ = [
     "ModelContext",
     "ContextSource",
     "LiveDesktopSource",
+    "LiveDesktopWriter",
+    "WriteResult",
     "DesktopInstance",
     "find_instances",
     "find_adomd_dll",
