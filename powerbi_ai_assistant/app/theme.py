@@ -96,12 +96,17 @@ h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:inher
 .stButton>button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover{
   background:var(--accent-2)!important; border-color:var(--accent-2)!important; color:#1B1F2A!important;
 }
-/* sidebar settings gear: bigger, centered glyph, square */
-.st-key-ui_gear_btn button{
+/* sidebar settings gear: just the glyph, no button frame (override Streamlit's own button styles) */
+[data-testid="stSidebar"] .st-key-ui_gear_btn button,
+[data-testid="stSidebar"] .st-key-ui_gear_btn button:hover,
+[data-testid="stSidebar"] .st-key-ui_gear_btn button:focus,
+[data-testid="stSidebar"] .st-key-ui_gear_btn button:focus-visible,
+[data-testid="stSidebar"] .st-key-ui_gear_btn button:active{
   padding:.35rem 0!important; min-height:2.6rem;
-  display:flex; align-items:center; justify-content:center;
+  display:flex!important; align-items:center; justify-content:center;
+  background:transparent!important; border:0!important; box-shadow:none!important; outline:none!important;
 }
-.st-key-ui_gear_btn button p{ font-size:1.4rem!important; line-height:1; margin:0; }
+[data-testid="stSidebar"] .st-key-ui_gear_btn button p{ font-size:1.4rem!important; line-height:1; margin:0; }
 
 /* inputs — keep a clear border so the box stands out; fill/text follow the theme (light or dark) */
 [data-testid="stTextArea"] [data-baseweb="textarea"],
@@ -132,12 +137,27 @@ h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:inher
    are just light separators. */
 .st-key-dax_topbar{ padding:.2rem 0 .4rem; border-bottom:1px solid var(--border); margin-bottom:.3rem; }
 .st-key-dax_composer{ padding:.5rem 0 .2rem; }
-/* the inline send icon — gold square that reads as the send affordance */
-.st-key-dax_send_btn button{
-  background:var(--accent)!important; border:1px solid var(--accent)!important; color:#1B1F2A!important;
-  border-radius:10px!important; padding:.45rem 0!important;
+
+/* the chat history box: make it stand out from the page (white surface, clear border, soft shadow) */
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-chat_box),
+[data-testid="stVerticalBlockBorderWrapper"]:has(> .st-key-chat_box){
+  background:var(--surface)!important; border:1.5px solid #C9CFDA!important;
+  border-radius:14px!important; box-shadow:0 3px 14px rgba(27,31,42,.08)!important;
 }
+.st-key-chat_box{ background:transparent!important; }
+/* composer icon buttons (cancel ✕ + send ➤): identical size, centered glyph */
+.st-key-dax_cancel_btn button, .st-key-dax_send_btn button{
+  min-height:2.6rem!important; height:2.6rem!important; padding:0!important; border-radius:10px!important;
+  display:flex!important; align-items:center; justify-content:center;
+}
+.st-key-dax_cancel_btn button *, .st-key-dax_send_btn button *{
+  font-size:1.25rem!important; line-height:1!important; margin:0!important;
+}
+/* send = gold; cancel = neutral outline */
+.st-key-dax_send_btn button{ background:var(--accent)!important; border:1px solid var(--accent)!important; color:#1B1F2A!important; }
 .st-key-dax_send_btn button:hover{ background:var(--accent-2)!important; border-color:var(--accent-2)!important; }
+.st-key-dax_cancel_btn button{ background:var(--surface)!important; border:1.5px solid #C9CFDA!important; color:var(--ink-2)!important; }
+.st-key-dax_cancel_btn button:hover{ border-color:var(--ink)!important; color:var(--ink)!important; }
 
 /* code blocks → monospace data surface */
 [data-testid="stCode"], pre{ border-radius:10px!important; border:1px solid var(--border)!important; }

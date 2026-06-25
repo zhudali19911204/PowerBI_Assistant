@@ -32,9 +32,13 @@ _TABLE_FUNCS = (
 _TABLE_RE = re.compile(r"^\s*(?:VAR\b.*\bRETURN\s+)?(" + "|".join(_TABLE_FUNCS) + r")\s*\(", re.IGNORECASE | re.DOTALL)
 
 
+_COMMENTS_RE = re.compile(r"/\*.*?\*/|(?://|--)[^\n]*", re.DOTALL)
+
+
 def is_table_expression(expression: str) -> bool:
-    """Heuristic: does this DAX expression return a TABLE (calculated table) rather than a scalar?"""
-    return bool(_TABLE_RE.match(expression))
+    """Heuristic: does this DAX expression return a TABLE (calculated table) rather than a scalar?
+    Comments are stripped first so a leading `// ...` line doesn't hide the table-returning function."""
+    return bool(_TABLE_RE.match(_COMMENTS_RE.sub("", expression).strip()))
 
 # A single slice predicate: (table, column, value). Value is a real Python value from the engine.
 SliceFilter = tuple[str, str, Any]

@@ -7,6 +7,7 @@ from .generate import (
     ParsedMeasure,
     has_dax_block,
     measure_expression,
+    parse_dax_blocks,
     parse_measure_response,
     split_measures,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "DaxMeasureArtifact",
     "ParsedMeasure",
     "parse_measure_response",
+    "parse_dax_blocks",
     "has_dax_block",
     "measure_expression",
     "split_measures",

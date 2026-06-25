@@ -20,4 +20,10 @@ Development state as of 2026-06-24 (phase-1 DAX assistant, Streamlit app run via
 
 **Milestones**: M0–M4, M6, M7 done; calibrated generation + chat + write-back are beyond the original plan. M5 (standalone explain/optimize actions) folded into chat. Phase 2/3 (M cleaning, modeling, dashboards) not started.
 
-**Likely next**: re-add a "batch write measures" button (removed in the table/measure refactor); maybe native reasoning tokens; phase-2 capabilities. Runtime pitfalls collected in [[dax-and-engine-gotchas]]. Project overview: [[powerbi-ai-assistant-project]].
+**Status (2026-06-25): phase-1 DAX assistant is paused here — "先这样" — it's at a good stopping point.** Packaging for colleagues is also done ([[packaging-distribution-gotchas]]). Distribution UI is light-only with the app-mode-window launcher.
+
+**Likely next:**
+- **Multi-point calibration for 校准式生成 (user's explicit next-up TODO).** Today calibration pins the measure against ONE known-correct value at ONE slice; the planned enhancement is to let the user supply SEVERAL calibration points (multiple slices/expected values) and require the measure to match all of them — this disambiguates measures that happen to be right at one slice but wrong elsewhere, and forces a more precise requirement. Affects `dax/calibrate.py` (`CalibrationSession` currently holds a single `filters`/`expected`; would become a list of points) and the calibrate UI/prompts.
+- Re-add a "batch write measures" button (removed in the table/measure refactor); maybe native reasoning tokens; phase-2 capabilities.
+
+Runtime pitfalls collected in [[dax-and-engine-gotchas]]. Project overview: [[powerbi-ai-assistant-project]].

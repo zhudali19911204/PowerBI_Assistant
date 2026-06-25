@@ -22,9 +22,8 @@ from ..dax import (
     advance,
     has_dax_block,
     is_table_expression,
-    parse_measure_response,
+    parse_dax_blocks,
     slice_desc,
-    split_measures,
     validate_measure_set,
 )
 from ..dax.prompts import build_chat_system_prompt
@@ -153,14 +152,22 @@ def render_model_source_sidebar() -> ModelContext | None:
     cached in session_state. Returns it, or None if not connected yet.
     """
     with st.sidebar:
-        eyebrow("数据源")
         ctx: ModelContext | None = st.session_state.get("model_ctx")
 
-        # Traffic light: red = not connected, green = connected. (No instance details — just state.)
-        if ctx is not None:
-            st.markdown("🟢 **已连接**")
-        else:
-            st.markdown("🔴 未连接")
+        # "模型来源" eyebrow with a built-in traffic-light dot: green = connected, red = not.
+        connected = ctx is not None
+        dot = "#0E9F6E" if connected else "#D6453C"  # --ok / --bad
+        label = "已连接" if connected else "未连接"
+        st.markdown(
+            f'<div style="font-size:.7rem;font-weight:600;letter-spacing:.14em;'
+            f'text-transform:uppercase;color:#737B8C;margin:.2rem 0 .55rem;'
+            f'display:flex;align-items:center;gap:.5rem;">'
+            f'<span style="width:9px;height:9px;border-radius:50%;background:{dot};'
+            f'box-shadow:0 0 0 3px {dot}22;flex:0 0 auto;"></span>模型来源'
+            f'<span style="margin-left:auto;color:{dot};letter-spacing:.04em;">{label}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
         if st.button("🔌 连接 Power BI Desktop", type="primary", use_container_width=True):
             _scan_and_connect()
@@ -268,7 +275,7 @@ def _render_capability(cap: Capability, cfg: RuntimeConfig, ctx: ModelContext | 
             # (`st-key-dax_topbar`), so they stay put while the chat history scrolls underneath.
             with st.container(key="dax_topbar"):
                 mode = st.radio(
-                    "生成模式", ["💬 AI 对话", "🎯 校准式生成"],
+                    "生成模式", ["💬 基础 DAX 生成", "🎯 校准式生成"],
                     horizontal=True, key="dax_mode", label_visibility="collapsed",
                 )
                 chat_toggles = _render_chat_toggles() if mode.startswith("💬") else None
@@ -310,6 +317,11 @@ def _submit_chat() -> None:
     st.session_state["dax_gen_text"] = ""
 
 
+def _clear_chat_input() -> None:
+    """Cancel the unsent draft: empty the composer (callback → safe to reset the widget key)."""
+    st.session_state["dax_gen_text"] = ""
+
+
 def _render_dax_chat(cfg: RuntimeConfig, ctx: ModelContext, write_on: bool, deep_think: bool) -> None:
     """A general grounded chat: ask anything, get reasoning + a measure, auto run-verified; with the write
     toggle on, a validated measure can be written straight into the open Power BI model. The two toggles
@@ -317,9 +329,15 @@ def _render_dax_chat(cfg: RuntimeConfig, ctx: ModelContext, write_on: bool, deep
     port = st.session_state.get("model_ctx_port")
 
     msgs: list[dict] = st.session_state.setdefault("chat_msgs", [])
+    # Clear-conversation control above the history (right-aligned, disabled when already empty).
+    _, c_clear = st.columns([4, 1])
+    with c_clear:
+        if st.button("🗑 清除对话", key="chat_clear", use_container_width=True, disabled=not msgs):
+            st.session_state["chat_msgs"] = []
+            st.rerun()
     # History lives in a fixed-height scroll box, so the top controls and the bottom composer stay put
     # by construction — they're outside the scrolling region. Far more reliable than CSS sticky.
-    chat_box = st.container(height=620)
+    chat_box = st.container(height=620, key="chat_box")
     with chat_box:
         for i, m in enumerate(msgs):
             with st.chat_message(m["role"]):
@@ -333,13 +351,16 @@ def _render_dax_chat(cfg: RuntimeConfig, ctx: ModelContext, write_on: bool, deep
     # allowed inside a callback (it runs before the widget is re-instantiated). Wrapped in a keyed
     # container (`st-key-dax_composer`) so theme.py can pin it to the bottom.
     with st.container(key="dax_composer"):
-        c_in, c_btn = st.columns([20, 1], vertical_alignment="center")
+        c_in, c_cancel, c_btn = st.columns([18, 1, 1], vertical_alignment="center")
         with c_in:
             st.text_input(
                 "消息", key="dax_gen_text", label_visibility="collapsed",
                 placeholder="问我任何 Power BI / DAX 问题…（左侧点字段可插入引用，回车发送）",
                 on_change=_submit_chat,
             )
+        with c_cancel:
+            st.button(":material/close:", key="dax_cancel_btn", on_click=_clear_chat_input,
+                      help="取消发送（清空输入）", use_container_width=True)
         with c_btn:
             st.button(":material/send:", key="dax_send_btn", on_click=_submit_chat,
                       help="发送（也可按回车）", use_container_width=True)
@@ -373,10 +394,12 @@ def _render_dax_chat(cfg: RuntimeConfig, ctx: ModelContext, write_on: bool, deep
         # items, classify each, and validate it the right way — a table via EVALUATE, a measure via the
         # set-validator (which isolates a syntactically-broken sibling).
         if has_dax_block(str(text)):
-            parts = split_measures(parse_measure_response(str(text)).code)
+            # One object per ```dax block (no within-block splitting). Default a name if the model omitted it.
+            parts = parse_dax_blocks(str(text))
             items: list[dict[str, Any]] = [
-                {"name": n, "expr": e, "kind": "table" if is_table_expression(e) else "measure"}
-                for n, e in parts
+                {"name": n or f"度量值_{i + 1}", "expr": e,
+                 "kind": "table" if is_table_expression(e) else "measure"}
+                for i, (n, e) in enumerate(parts)
             ]
             if items:
                 entry["items"] = items

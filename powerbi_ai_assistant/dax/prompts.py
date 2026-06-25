@@ -168,18 +168,19 @@ CONVERSATION MODE
   heading exactly `## 思考过程`, covering: 理解需求 → 涉及的表/列/关系 → 行/筛选上下文分析 → 计算步骤。
   Keep it concise but real — this is how the user checks your logic. ALL prose, dividers, section titles,
   and any base-measure scaffolding go HERE, above the code block — never inside it.
-- Then put the measure(s) in a SINGLE ```dax code block. Inside the block, write each measure as
-  `度量值名 = <表达式>` on its own — and NOTHING else: no `=====` dividers, no `##` headers, no numbered
-  section titles, no prose or comments. Prefer ONE measure (inline intermediate steps with VAR); only add
-  separate base measures when they're genuinely reused, and if so define each base measure BEFORE the
-  measure that references it.
-- Then, below the block, one line on behavior + any assumption to confirm. For pure questions (no measure
+- Then output the measure(s). PUT EACH MEASURE IN ITS OWN SEPARATE ```dax code block — exactly ONE
+  object per block. If you produce several measures (e.g. a base measure plus derived ones), emit several
+  separate ```dax blocks, one per measure, each as `度量值名 = <表达式>`. NEVER put two measures in the
+  same block. The `度量值名 = ` line MUST come FIRST in the block (before any comment). You MAY add brief
+  `//` comments for readability. Do NOT put `=====` dividers, `##` headers, or prose inside the block. If a
+  measure references another, define the referenced one in an earlier block.
+- Then, below the blocks, one line on behavior + any assumption to confirm. For pure questions (no measure
   needed), just answer normally.
 - VAR names must be plain ASCII identifiers (letters/digits/underscore) — DAX rejects non-Latin variable
   names like `VAR 当前值`. Measure and column names may be Chinese; only VAR names must be ASCII.
-- If the user asks for a CALCULATED TABLE (e.g. a date/calendar table), write it the same way —
-  `表名 = <返回表的表达式>` (e.g. `Dim_Date = ADDCOLUMNS ( CALENDAR ( ... ), "年", YEAR ( [Date] ) )`) in the
-  ```dax block. The app detects table vs measure automatically.
+- If the user asks for a CALCULATED TABLE (e.g. a date/calendar table), write it the same way, in its OWN
+  ```dax block — `表名 = <返回表的表达式>` (e.g. `Dim_Date = ADDCOLUMNS ( CALENDAR ( ... ), "年", YEAR ( [Date] ) )`).
+  The app detects table vs measure automatically.
 - Reference ONLY tables/columns/measures in the schema below.
 
 {_SCHEMA_BLOCK.format(model_schema=model_schema)}"""

@@ -1,0 +1,14 @@
+# Runtime-only dependencies for the distributable build (Python 3.12, Windows).
+# Pinned to the versions verified on the dev machine. Dev tools (pytest/ruff/black/mypy) and the
+# dropped `pbixray` dependency are intentionally excluded — they are not needed to run the app.
+streamlit==1.58.0
+pydantic-settings==2.14.2
+python-dotenv==1.2.2
+anthropic==0.111.0
+openai==2.43.0
+pandas==3.0.3
+# Verify TLS against the OS trust store so the LLM call + the one-time TOM download work behind a
+# corporate SSL-inspection proxy (see powerbi_ai_assistant/net.py).
+truststore>=0.9
+# Live Power BI Desktop connection (read + write-back). Windows-only.
+pythonnet==3.1.0 ; sys_platform == "win32"
