@@ -1,7 +1,7 @@
 """DAX capability: generate / explain / optimize measures grounded in the model."""
 
 from .artifact import DaxMeasureArtifact
-from .calibrate import CalibrationSession, advance, slice_desc
+from .calibrate import CalibrationPoint, CalibrationSession, advance, slice_desc
 from .capability import DaxCapability, GenerateAction
 from .generate import (
     ParsedMeasure,
@@ -27,6 +27,7 @@ __all__ = [
     "validate_measure_set",
     "is_table_expression",
     "CalibrationSession",
+    "CalibrationPoint",
     "advance",
     "slice_desc",
 ]

@@ -110,3 +110,110 @@ def test_engine_error_is_a_failed_result():
     # exhausts auto budget, then asks the user
     assert s.status == "asking"
     assert any("执行出错" in e["text"] for e in s.transcript if e["kind"] == "result")
+
+
+# --------------------------------------------------------------------- multi-point (phases ①+②)
+
+from powerbi_ai_assistant.dax import CalibrationPoint  # noqa: E402
+
+
+class KeyedSliceEvaluator:
+    """Returns a value keyed by the slice's filter value(s) — so each point can resolve independently."""
+
+    def __init__(self, by_value):
+        self.by_value = by_value
+
+    def evaluate_at_slice(self, expression, home_table, filters):
+        return ValidationResult(ok=True, sample=self.by_value.get(tuple(v for _, _, v in filters)),
+                                run_verified=True)
+
+
+_PTS = [CalibrationPoint([("Dim", "Year", 2024)], 100.0),
+        CalibrationPoint([("Dim", "Year", 2025)], 250.0)]
+
+
+def _last_result(s):
+    return [e for e in s.transcript if e["kind"] == "result"][-1]
+
+
+def test_back_compat_single_point_folds_into_points():
+    s = _session()
+    assert len(s.points) == 1 and s.points[0].expected == 100.0
+    assert s.filters == [("Dim", "Year", 2024)] and s.expected == 100.0   # legacy display fields kept
+
+
+def test_multipoint_passes_only_when_all_match():
+    s = CalibrationSession(request="r", home_table="Sales", points=list(_PTS))
+    s = advance(s, provider=SeqProvider(["```dax\nM = SUM ( Sales[Amount] )\n```"]),
+                evaluator=KeyedSliceEvaluator({(2024,): 100.0, (2025,): 250.0}), context=_model())
+    assert s.status == "passed"
+    pts = _last_result(s)["points"]
+    assert len(pts) == 2 and all(p["ok"] for p in pts)
+
+
+def test_multipoint_one_miss_blocks_pass():
+    s = CalibrationSession(request="r", home_table="Sales", points=list(_PTS))
+    s = advance(s, provider=SeqProvider(["```dax\nM = SUM ( Sales[Amount] )\n```"]),
+                evaluator=KeyedSliceEvaluator({(2024,): 100.0, (2025,): 999.0}), context=_model())
+    assert s.status != "passed"
+    assert [p["ok"] for p in _last_result(s)["points"]] == [True, False]
+
+
+def test_parse_json_obj_fenced_bare_and_none():
+    from powerbi_ai_assistant.dax.calibrate import _parse_json_obj
+    assert _parse_json_obj('```json\n{"a": 1}\n```') == {"a": 1}
+    assert _parse_json_obj('blah {"a": 2, "b": 3} tail') == {"a": 2, "b": 3}
+    assert _parse_json_obj("no json here") is None
+
+
+def _asking_session(points):
+    """A session paused on a question, with a candidate already proposed (the usual reply context)."""
+    s = CalibrationSession(request="r", home_table="Sales", points=list(points))
+    s.candidate, s.candidate_name, s.status = "M = SUM ( Sales[Amount] )", "M", "asking"
+    return s
+
+
+def test_reply_corrects_target_value_then_candidate_passes():
+    # 2nd target was mistyped (38.0); the user corrects it to 34.28 in chat. The controller must update the
+    # oracle deterministically and re-test the CURRENT candidate — which now hits both.
+    pts = [CalibrationPoint([("Dim", "Year", 2024)], 100.0),
+           CalibrationPoint([("Dim", "Year", 2025)], 38.0)]
+    s = _asking_session(pts)
+    provider = SeqProvider(['{"kind":"fix_targets","updates":[{"point":2,"expected":34.28}],"note":"更正切片2"}'])
+    s = advance(s, provider=provider,
+                evaluator=KeyedSliceEvaluator({(2024,): 100.0, (2025,): 34.28}),
+                context=_model(), user_reply="第二个切片应该是 34.28")
+
+    assert s.points[1].expected == 34.28          # oracle updated
+    assert s.status == "passed"                   # current candidate now hits both
+    assert provider.calls == 1                    # only the interpret call; re-test passed, no diagnose
+    assert any(e["kind"] == "note" for e in s.transcript)   # the correction was echoed back
+
+
+def test_reply_clarify_leaves_targets_unchanged():
+    pts = [CalibrationPoint([("Dim", "Year", 2024)], 100.0)]
+    s = _asking_session(pts)
+    provider = SeqProvider([
+        '{"kind":"clarify","updates":[],"note":"含税"}',          # interpret → not a value correction
+        "```dax\nM = CALCULATE ( SUM ( Sales[Amount] ) )\n```",   # diagnose → corrected measure
+    ])
+    s = advance(s, provider=provider, evaluator=SeqSliceEvaluator([100.0]),
+                context=_model(), user_reply="含税")
+
+    assert s.points[0].expected == 100.0          # target untouched on a clarify
+    assert provider.calls == 2                     # interpret + diagnose (the normal clarify path)
+
+
+def test_diagnose_prompt_includes_all_points_and_per_point_results():
+    from powerbi_ai_assistant.dax.calibrate import _results_text, points_brief
+    from powerbi_ai_assistant.dax.prompts import build_calibrate_diagnose_prompt
+
+    s = CalibrationSession(request="r", home_table="Sales", points=list(_PTS))
+    # one failing test round so a per-point result exists
+    s = advance(s, provider=SeqProvider(["```dax\nM = SUM ( Sales[Amount] )\n```"]),
+                evaluator=KeyedSliceEvaluator({(2024,): 100.0, (2025,): 999.0}), context=_model())
+    pts, results = points_brief(s.points), _results_text(s)
+    assert "切片1" in pts and "切片2" in pts                 # both targets listed
+    assert "✓ 命中" in results and "✗ 未命中" in results      # per-point pass/fail shown
+    prompt = build_calibrate_diagnose_prompt("SCHEMA", s.request, pts, results, s.candidate, "(无)")
+    assert "切片2" in prompt and "✗ 未命中" in prompt and "ALL targets" in prompt

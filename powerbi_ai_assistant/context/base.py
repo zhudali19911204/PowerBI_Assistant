@@ -52,6 +52,18 @@ class ModelContext:
     # otherwise a measure referencing one would be wrongly judged "non-existent".
     calculated_tables: dict[str, str] = field(default_factory=dict)
 
+    # --- Power Query (M) grounding (phase 2) ---
+    # Each loaded table's defining M, from its import partition's QueryDefinition (table name -> M).
+    # Calculated tables have no M and are absent here. This is the starting point the M assistant
+    # rewrites/cleans on top of.
+    table_queries: dict[str, str] = field(default_factory=dict)
+    # Named M expressions that don't load to a table: parameters and shared/staging queries
+    # (name -> M). Cleaning M often references these, so they're part of the grounding facts.
+    shared_expressions: dict[str, str] = field(default_factory=dict)
+    # Power Query "query group" folder each loaded query sits in (query name -> folder path);
+    # absent / "" means ungrouped (root). Drives the sidebar's Power Query browser.
+    query_folders: dict[str, str] = field(default_factory=dict)
+
     # --- grounding queries (used by static validation) ---
     def has_table(self, table: str) -> bool:
         return table in self.tables or table in self.calculated_tables
@@ -61,6 +73,14 @@ class ModelContext:
 
     def has_measure(self, name: str) -> bool:
         return any(m.name == name for m in self.measures)
+
+    def has_query(self, name: str) -> bool:
+        """True if `name` is a referenceable M query (a loaded table query or a shared expression)."""
+        return name in self.table_queries or name in self.shared_expressions
+
+    def query_names(self) -> list[str]:
+        """All referenceable M query names (loaded-table queries first, then shared/parameter ones)."""
+        return list(self.table_queries) + list(self.shared_expressions)
 
     # --- prompt serialization ---
     def serialize_for_prompt(self, focus: list[str] | None = None) -> str:
@@ -109,6 +129,26 @@ class ModelContext:
             for m in measures:
                 lines.append(f"  [{m.name}] = {m.expression}")
 
+        return "\n".join(lines)
+
+    def serialize_query_for_prompt(self, name: str) -> str:
+        """Render the M grounding for cleaning query `name`: its current M, its output columns, and the
+        other queries/parameters it may reference. Used to build a grounded Power Query (M) prompt."""
+        lines: list[str] = []
+        current = self.table_queries.get(name) or self.shared_expressions.get(name)
+        if current is not None:
+            lines.append(f"CURRENT QUERY '{name}' (M):")
+            lines.append(current.strip())
+        if name in self.tables and self.tables[name]:
+            lines.append(f"\nOUTPUT COLUMNS of '{name}':")
+            for c in self.tables[name]:
+                lines.append(f"  [{c.name}] ({c.dtype})")
+        others = [q for q in self.query_names() if q != name]
+        if others:
+            lines.append("\nOTHER REFERENCEABLE QUERIES / PARAMETERS (reference as #\"Name\"):")
+            for q in others:
+                kind = "parameter/shared" if q in self.shared_expressions else "table query"
+                lines.append(f"  '{q}'  ({kind})")
         return "\n".join(lines)
 
 

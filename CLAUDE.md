@@ -22,14 +22,15 @@ AI 辅助 Power BI 四大痛点（数据清洗 / 建模 / **DAX** / 仪表盘）
 ## 代码与架构约定
 - **四个横切抽象**复用于各期：`LLMProvider` / `ContextSource` / `Capability`·`Action` / `Artifact`。加新能力 = 新 `Capability` 子类 + `register()`，UI 自动渲染。
 - **Grounding 优先**：所有 DAX/M 生成只能引用 `ModelContext` 中真实存在的表/列/度量值，禁止臆造。
-- **实跑验证是一期硬需求**：DAX 走"生成→静态校验→实跑 `EVALUATE`→修复"闭环（§13.2）；无 Desktop 时降级静态校验并显式标注"未经实跑验证"。
-- **DAX 知识双资产同步**：`.claude/skills/dax-expert/` 是权威知识库，`powerbi_ai_assistant/dax/prompts.py` 是产品内压缩版——**先改 skill，再回写 prompts.py**。
+- **实跑验证是硬需求**：DAX 走"生成→静态校验→实跑 `EVALUATE`→修复"闭环（§13.2）；二期 Power Query(M) 走"生成→静态 lint→实跑**刷新回环**（TOM 临时表 + `Table.Schema` 探针，见 [[mquery-refresh-verification]]）→修复"。无 Desktop 时降级静态校验并显式标注"未经实跑验证"。
+- **知识双资产同步**：`.claude/skills/<name>-expert/` 是权威知识库，`powerbi_ai_assistant/<name>/prompts.py` 是产品内压缩版——**先改 skill，再回写 prompts.py**。适用于 dax 与 mquery 两套。
 - LLM 切换只改 config，不改业务代码（经 `LLMProvider` 抽象）。
 
 ## 关键文件
 - 方案：[docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
-- DAX skill：[.claude/skills/dax-expert/](.claude/skills/dax-expert/)
-- DAX prompts：[powerbi_ai_assistant/dax/prompts.py](powerbi_ai_assistant/dax/prompts.py)
+- 二期设计（Power Query/M 助手）：[docs/PHASE2_POWERQUERY_DESIGN.md](docs/PHASE2_POWERQUERY_DESIGN.md)
+- DAX skill / prompts：[.claude/skills/dax-expert/](.claude/skills/dax-expert/) ↔ [powerbi_ai_assistant/dax/prompts.py](powerbi_ai_assistant/dax/prompts.py)
+- Power Query(M) skill / prompts：[.claude/skills/mquery-expert/](.claude/skills/mquery-expert/) ↔ [powerbi_ai_assistant/mquery/prompts.py](powerbi_ai_assistant/mquery/prompts.py)
 - 评测脚手架：`.claude/skills/dax-expert-workspace/`
 
 ## Memory 双向同步
@@ -41,4 +42,7 @@ AI 辅助 Power BI 四大痛点（数据清洗 / 建模 / **DAX** / 仪表盘）
 
 ## 通用规则（自定义 — 待补充）
 <!-- 在下面追加你的规则，例如命名规范、提交信息格式、禁止事项等 -->
-- 
+- **改完 UI 代码必须干净重启 Streamlit，否则浏览器看到的是旧实例**。常见坑：旧实例没杀掉仍占着 8501，新实例 `exit 1` 起不来，浏览器命中旧代码 → 表现为"改动没生效"。固定流程：
+  1. 杀掉 8501 上**所有** PID：`for p in $(netstat -ano | grep ':8501' | grep LISTENING | awk '{print $NF}' | sort -u); do taskkill //F //PID $p; done`，`sleep 2` 后确认 `8501 free`；
+  2. 用**项目 venv** 的 Python 起（`.venv/Scripts/python.exe -m streamlit ...`，**不是**系统 Python，系统 Python 没装 streamlit）；
+  3. 起好后确认只有**一个** LISTENING PID，再让用户 Ctrl+F5 强刷验证。

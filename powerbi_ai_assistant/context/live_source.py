@@ -175,6 +175,14 @@ class _LiveSession:
             rdr.Close()
 
 
+def _safe_query(session: "_LiveSession", dax: str) -> list[dict[str, Any]]:
+    """Run a DMV query, returning [] if the engine rejects it (older engines may lack some DMVs)."""
+    try:
+        return session.query(dax)
+    except Exception:  # noqa: BLE001 — optional grounding; absence degrades gracefully
+        return []
+
+
 def _to_py(value: Any) -> Any:
     """Coerce a value returned by ADOMD to a native Python type. pythonnet auto-converts primitives but
     leaves System.DateTime / System.Decimal as .NET objects, which can't be pickled into session_state."""
@@ -198,11 +206,17 @@ def _to_py(value: Any) -> Any:
 # Pure builder — turn DMV rows into a ModelContext. Separated from .NET so it's unit-testable.
 # ------------------------------------------------------------------------------------------------
 
+_PARTITION_M_TYPE = (1, 4)  # TMSCHEMA_PARTITIONS.Type: 1=Query, 4=M carry an M QueryDefinition (2=Calculated)
+
+
 def build_model_context(
     tables: list[dict[str, Any]],
     columns: list[dict[str, Any]],
     relationships: list[dict[str, Any]],
     measures: list[dict[str, Any]],
+    partitions: list[dict[str, Any]] | None = None,
+    expressions: list[dict[str, Any]] | None = None,
+    query_groups: list[dict[str, Any]] | None = None,
 ) -> ModelContext:
     """Build a ModelContext from raw TMSCHEMA DMV rows (auto-date tables and RowNumber columns dropped)."""
     tname = {r["ID"]: r["Name"] for r in tables}
@@ -248,8 +262,40 @@ def build_model_context(
             continue
         meass.append(Measure(name=m["Name"], table=t, expression=str(m.get("Expression", "")).strip()))
 
+    # Power Query (M): each loaded table's defining M (from its M/Query partition), plus named
+    # expressions (parameters / shared queries) that don't load to a table.
+    gid_folder = {g["ID"]: str(g.get("Folder") or "").strip() for g in (query_groups or [])}
+    table_queries: dict[str, str] = {}
+    query_folders: dict[str, str] = {}
+    for p in partitions or []:
+        t = tname.get(p.get("TableID"))
+        if t is None or is_auto.get(p.get("TableID")):
+            continue
+        qd = str(p.get("QueryDefinition") or "").strip()
+        if qd and (p.get("Type") in _PARTITION_M_TYPE or qd.lower().startswith("let")):
+            if t not in table_queries:  # first M partition per table
+                table_queries[t] = qd
+                folder = gid_folder.get(p.get("QueryGroupID"), "")
+                if folder:
+                    query_folders[t] = folder
+
+    shared_expressions: dict[str, str] = {}
+    for e in expressions or []:
+        nm = e.get("Name")
+        expr = str(e.get("Expression") or "").strip()
+        if nm and expr:
+            shared_expressions[nm] = expr
+
     # calculated_tables stays empty: live exposes their columns, so they're just regular `tables` now.
-    return ModelContext(tables=tcols, relationships=rels, measures=meass, date_tables=date_tables)
+    return ModelContext(
+        tables=tcols,
+        relationships=rels,
+        measures=meass,
+        date_tables=date_tables,
+        table_queries=table_queries,
+        shared_expressions=shared_expressions,
+        query_folders=query_folders,
+    )
 
 
 # ------------------------------------------------------------------------------------------------
@@ -263,6 +309,9 @@ _Q_RELS = (
     "FROM $SYSTEM.TMSCHEMA_RELATIONSHIPS"
 )
 _Q_MEASURES = "SELECT [TableID],[Name],[Expression] FROM $SYSTEM.TMSCHEMA_MEASURES"
+_Q_PARTITIONS = "SELECT [TableID],[Name],[QueryDefinition],[Type],[QueryGroupID] FROM $SYSTEM.TMSCHEMA_PARTITIONS"
+_Q_EXPRESSIONS = "SELECT [Name],[Kind],[Expression] FROM $SYSTEM.TMSCHEMA_EXPRESSIONS"
+_Q_QUERY_GROUPS = "SELECT [ID],[Folder] FROM $SYSTEM.TMSCHEMA_QUERY_GROUPS"
 
 
 class LiveDesktopSource(ContextSource):
@@ -280,7 +329,10 @@ class LiveDesktopSource(ContextSource):
             columns = s.query(_Q_COLUMNS)
             rels = s.query(_Q_RELS)
             measures = s.query(_Q_MEASURES)
-        return build_model_context(tables, columns, rels, measures)
+            partitions = _safe_query(s, _Q_PARTITIONS)  # M grounding; tolerate older engines
+            expressions = _safe_query(s, _Q_EXPRESSIONS)
+            query_groups = _safe_query(s, _Q_QUERY_GROUPS)  # Power Query folder structure
+        return build_model_context(tables, columns, rels, measures, partitions, expressions, query_groups)
 
     def column_values(self, table: str, column: str, top: int = 500) -> list[Any]:
         """Distinct values of a column (for the calibration slice dropdown). Capped via TOPN."""

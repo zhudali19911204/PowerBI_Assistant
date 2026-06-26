@@ -186,42 +186,50 @@ CONVERSATION MODE
 {_SCHEMA_BLOCK.format(model_schema=model_schema)}"""
 
 
-def build_calibrated_generate_prompt(model_schema: str, request: str, slice_desc: str, expected: str) -> str:
-    """First candidate for calibrated generation: the user has a known-correct value at one slice."""
+def build_calibrated_generate_prompt(model_schema: str, request: str, points: str) -> str:
+    """First candidate for calibrated generation: the user has known-correct values at one or more slices.
+
+    `points` is the rendered calibration set (each slice → its required value). The measure must reproduce
+    EVERY one of them — multiple points disambiguate a measure that is right at one slice but wrong elsewhere.
+    """
     return f"""\
 Write a Power BI DAX measure for the request, grounded in the schema. The user has hand-computed the
-correct value at ONE specific slice — treat it as ground truth your measure must reproduce there.
+correct value at one or MORE specific slices — treat each as ground truth your measure MUST reproduce at
+that slice.
 
 REQUEST:
 {request}
 
-CALIBRATION (the measure MUST return this at the given slice):
-- At slice: {slice_desc}
-- Correct value: {expected}
+CALIBRATION TARGETS (the measure MUST return each value at its slice — ALL of them):
+{points}
 
 {_SCHEMA_BLOCK.format(model_schema=model_schema)}
 
-Reason about the evaluation context this slice implies (which filters are active), then return a `dax`
-code block with the measure and a one-line note on how it behaves. Reference only objects in the schema."""
+Reason about the evaluation context each slice implies (which filters are active) and what single measure
+satisfies ALL targets at once, then return a `dax` code block with the measure and a one-line note on how
+it behaves. Reference only objects in the schema."""
 
 
 def build_calibrate_diagnose_prompt(
-    model_schema: str, request: str, slice_desc: str, expected: str, actual: str, candidate: str, transcript: str
+    model_schema: str, request: str, points: str, results: str, candidate: str, transcript: str
 ) -> str:
-    """The measure ran but the slice value is wrong (or it errored). Either fix it, or ask the user.
+    """The measure ran but does not match all targets (or it errored). Either fix it, or ask the user.
 
+    `points` = the calibration targets; `results` = the latest per-slice actual-vs-expected (with ✓/✗).
     The reply is interpreted by the caller: a ```dax block = a revised measure to re-test; no dax block
     = a clarifying question shown to the user. This is the loop that forces a precise requirement.
     """
     return f"""\
-You are calibrating a DAX measure against a value the user knows is correct, and it does not match yet.
+You are calibrating a DAX measure against values the user knows are correct; it does not match all of them yet.
 
 REQUEST (the user's words, possibly imprecise):
 {request}
 
-SLICE: {slice_desc}
-EXPECTED (user's ground truth): {expected}
-ACTUAL (your current measure returned): {actual}
+CALIBRATION TARGETS (each slice → required value):
+{points}
+
+LATEST RESULTS (what your current measure returned at each slice):
+{results}
 
 CURRENT MEASURE:
 ```dax
@@ -233,28 +241,32 @@ CONVERSATION SO FAR:
 
 {_SCHEMA_BLOCK.format(model_schema=model_schema)}
 
+Focus on the slices marked ✗ (not yet matching). A correct measure must hit ALL targets simultaneously, so
+use the pattern across slices to locate the fault (e.g. right at one year but wrong at another → a time/
+context issue; off by a constant factor everywhere → wrong aggregation or tax/unit).
 Decide between two responses:
 1. If you can confidently see the fix (wrong aggregation, missing/extra filter, context-transition issue,
    wrong grain, sign, etc.), return ONLY a corrected `dax` code block — it will be re-tested automatically.
 2. If the gap comes from genuine ambiguity in the request (you cannot know the user's intent), DO NOT
    guess and DO NOT output any dax. Instead ask the user ONE short, specific question that would resolve
-   it — phrased so the answer pins down the requirement (e.g. "Should this include tax?", "Year-over-year
-   vs the same period last year?", "Across all months in the year, or only the selected month?").
-Choose the response that most efficiently converges on the correct measure."""
+   it (e.g. "Should this include tax?", "Year-over-year vs the same period last year?").
+Choose the response that most efficiently converges on a measure that satisfies every target."""
 
 
 def build_calibrate_refine_prompt(
-    model_schema: str, request: str, slice_desc: str, expected: str, candidate: str, refine: str
+    model_schema: str, request: str, points: str, candidate: str, refine: str
 ) -> str:
-    """Refine an already-correct measure (perf/readability/rule tweak) while keeping the calibrated value."""
+    """Refine an already-correct measure (perf/readability/rule tweak) while keeping ALL calibrated values."""
     return f"""\
-The DAX measure below already returns the correct value ({expected}) at the slice ({slice_desc}).
+The DAX measure below already returns the correct value at ALL of these calibration slices:
+{points}
+
 The user now wants to refine it: {refine}
 
-Apply the requested change and return a `dax` code block. The revised measure MUST still return {expected}
-at that slice — it will be re-tested. If the change would genuinely alter the value at that slice (e.g.
-"exclude tax" really changes the number), do NOT output dax; instead say so in one line and ask the user to
-confirm the new correct value.
+Apply the requested change and return a `dax` code block. The revised measure MUST still return the same
+value at EVERY slice above — it will be re-tested. If the change would genuinely alter any of those values
+(e.g. "exclude tax" really changes the number), do NOT output dax; instead say so in one line and ask the
+user to confirm the new correct value(s).
 
 ORIGINAL REQUEST:
 {request}
@@ -265,6 +277,42 @@ CURRENT MEASURE:
 ```
 
 {_SCHEMA_BLOCK.format(model_schema=model_schema)}"""
+
+
+def build_calibrate_interpret_prompt(points: str, candidate: str, reply: str) -> str:
+    """Classify the user's reply during calibration into a small JSON the controller applies
+    deterministically: is the user CORRECTING a known-correct value (the oracle), or just clarifying the
+    business rule? This lets a mistyped oracle be fixed mid-conversation without the model chasing the
+    wrong number (the controller updates the target itself, rather than asking the model to "make it 38")."""
+    return f"""\
+During calibration the user just replied. Decide what they mean, then return ONLY a JSON object — no prose,
+no markdown, no code fence.
+
+CURRENT CALIBRATION TARGETS (1-based index → slice → required value):
+{points}
+
+CURRENT MEASURE (for context only):
+```dax
+{candidate}
+```
+
+USER REPLY:
+{reply}
+
+Classify into exactly one:
+- "fix_targets": the user is CORRECTING one or more known-correct values (the oracle / 标准值), e.g.
+  "第二个切片应该是 34.28", "其实第一个填错了，是 100", "切片2 改成 34.28", "the second one should be 34.28".
+- "clarify": the user is clarifying the BUSINESS RULE / 口径 (含税? 同比? 跨月? 去重?) and is NOT changing
+  any target number.
+
+Return JSON shaped exactly like one of these (1-based "point" indexes matching the targets above):
+{{"kind": "fix_targets", "updates": [{{"point": 2, "expected": 34.28}}], "note": "一句话中文说明"}}
+{{"kind": "clarify", "updates": [], "note": "一句话中文说明"}}
+
+Rules:
+- Put a number in "expected" ONLY when the user clearly states a corrected value for that slice.
+- If they name a slice without a number, or only describe the rule, use "clarify".
+- "expected" must be a plain JSON number — no thousands separators, no currency symbol, no quotes."""
 
 
 # Convenience map so a capability/dispatcher can look up the builder by action id.

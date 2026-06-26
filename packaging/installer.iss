@@ -9,7 +9,7 @@
   #define SrcDir "C:\pbibuild\PowerBI助手"
 #endif
 #define AppName "Power BI 助手"
-#define AppVer "1.0.0"
+#define AppVer "1.1.0"
 
 [Setup]
 AppName={#AppName}

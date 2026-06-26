@@ -96,6 +96,29 @@ h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:inher
 .stButton>button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover{
   background:var(--accent-2)!important; border-color:var(--accent-2)!important; color:#1B1F2A!important;
 }
+/* ---- top assistant nav (main menu): a separated bar of equal pill buttons ---- */
+.st-key-cap_nav{
+  border-bottom:1.5px solid var(--border)!important;
+  padding-bottom:.7rem!important; margin-bottom:1rem!important;
+}
+.st-key-cap_nav [data-testid="stHorizontalBlock"]{ gap:.5rem!important; }
+.st-key-cap_nav button{
+  min-height:2.7rem!important; height:2.7rem!important; border-radius:11px!important;
+  font-weight:600!important; font-size:.94rem!important; letter-spacing:.01em;
+  display:flex!important; align-items:center; justify-content:center;
+}
+/* inactive = ghost pill; hover lifts toward the accent */
+.st-key-cap_nav button[kind="secondary"], .st-key-cap_nav [data-testid="stBaseButton-secondary"]{
+  background:transparent!important; border:1.5px solid var(--border)!important; color:var(--ink-2)!important; box-shadow:none!important;
+}
+.st-key-cap_nav button[kind="secondary"]:hover, .st-key-cap_nav [data-testid="stBaseButton-secondary"]:hover{
+  border-color:var(--accent)!important; color:var(--ink)!important; background:var(--accent-tint)!important;
+}
+/* active = solid gold pill with a soft lift (the global primary rule fills it gold) */
+.st-key-cap_nav button[kind="primary"], .st-key-cap_nav [data-testid="stBaseButton-primary"]{
+  border:1.5px solid var(--accent)!important; box-shadow:0 2px 10px rgba(214,158,46,.28)!important;
+}
+
 /* sidebar settings gear: just the glyph, no button frame (override Streamlit's own button styles) */
 [data-testid="stSidebar"] .st-key-ui_gear_btn button,
 [data-testid="stSidebar"] .st-key-ui_gear_btn button:hover,
@@ -135,29 +158,95 @@ h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:inher
 /* Top controls and bottom composer are kept frozen by construction — the chat history sits in a
    fixed-height scroll box between them (see components._render_dax_chat), so neither moves. These rules
    are just light separators. */
-.st-key-dax_topbar{ padding:.2rem 0 .4rem; border-bottom:1px solid var(--border); margin-bottom:.3rem; }
-.st-key-dax_composer{ padding:.5rem 0 .2rem; }
+.st-key-dax_topbar, .st-key-mq_topbar{ padding:.2rem 0 .4rem; margin-bottom:.3rem; }
+/* mquery topbar has no mode radio, so it keeps the separator at its own bottom */
+.st-key-mq_topbar{ border-bottom:1px solid var(--border); }
+/* DAX topbar: put the separator right UNDER the mode radio (基础/校准), above the toggles */
+.st-key-dax_topbar [data-testid="stRadio"]{ border-bottom:1px solid var(--border); padding-bottom:.5rem; margin-bottom:.55rem; }
+
+/* The composer is one cohesive "pill": a rounded white bar holding the (borderless) text box and the
+   two icon buttons, so it reads as a single control rather than three disjoint widgets. The whole pill
+   lights up on focus. */
+.st-key-dax_composer, .st-key-mq_composer{
+  background:var(--surface)!important; border:1.5px solid #C9CFDA!important; border-radius:18px!important;
+  box-shadow:0 2px 12px rgba(27,31,42,.06)!important; padding:.32rem .4rem .32rem .7rem!important;
+  margin-top:.5rem!important; transition:border-color .15s ease, box-shadow .15s ease;
+}
+.st-key-dax_composer:focus-within, .st-key-mq_composer:focus-within{
+  border-color:var(--accent)!important; box-shadow:0 0 0 3px var(--accent-tint), 0 2px 12px rgba(27,31,42,.08)!important;
+}
+/* tighten the inner row and vertically center everything */
+.st-key-dax_composer [data-testid="stHorizontalBlock"],
+.st-key-mq_composer [data-testid="stHorizontalBlock"]{ gap:.3rem!important; align-items:center!important; }
+/* text box: strip its own border/shadow so it dissolves into the pill */
+.st-key-dax_composer [data-baseweb="base-input"], .st-key-dax_composer [data-baseweb="input"],
+.st-key-mq_composer [data-baseweb="base-input"], .st-key-mq_composer [data-baseweb="input"]{
+  border:none!important; box-shadow:none!important; background:transparent!important;
+}
+.st-key-dax_composer [data-testid="stTextInput"] input,
+.st-key-mq_composer [data-testid="stTextInput"] input{ font-size:.95rem!important; padding-left:.1rem!important; }
 
 /* the chat history box: make it stand out from the page (white surface, clear border, soft shadow) */
 [data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-chat_box),
-[data-testid="stVerticalBlockBorderWrapper"]:has(> .st-key-chat_box){
+[data-testid="stVerticalBlockBorderWrapper"]:has(> .st-key-chat_box),
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-mq_chat_box),
+[data-testid="stVerticalBlockBorderWrapper"]:has(> .st-key-mq_chat_box){
   background:var(--surface)!important; border:1.5px solid #C9CFDA!important;
   border-radius:14px!important; box-shadow:0 3px 14px rgba(27,31,42,.08)!important;
 }
-.st-key-chat_box{ background:transparent!important; }
-/* composer icon buttons (cancel ✕ + send ➤): identical size, centered glyph */
-.st-key-dax_cancel_btn button, .st-key-dax_send_btn button{
-  min-height:2.6rem!important; height:2.6rem!important; padding:0!important; border-radius:10px!important;
+.st-key-chat_box, .st-key-mq_chat_box{ background:transparent!important; }
+/* hide the main pane / page scrollbar (wheel-scroll still works); sidebar scroll left intact */
+section.main::-webkit-scrollbar, [data-testid="stMain"]::-webkit-scrollbar,
+[data-testid="stAppViewContainer"]::-webkit-scrollbar, .stApp::-webkit-scrollbar,
+html::-webkit-scrollbar, body::-webkit-scrollbar{ width:0!important; height:0!important; }
+section.main, [data-testid="stMain"], [data-testid="stAppViewContainer"], .stApp, html, body{
+  scrollbar-width:none!important;
+}
+/* hide the chat history scrollbar (wheel-scroll still works) — keeps the box clean */
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-chat_box)::-webkit-scrollbar,
+[data-testid="stVerticalBlockBorderWrapper"]:has(> .st-key-chat_box)::-webkit-scrollbar,
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-mq_chat_box)::-webkit-scrollbar,
+[data-testid="stVerticalBlockBorderWrapper"]:has(> .st-key-mq_chat_box)::-webkit-scrollbar{ width:0!important; height:0!important; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-chat_box),
+[data-testid="stVerticalBlockBorderWrapper"]:has(> .st-key-chat_box),
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > .st-key-mq_chat_box),
+[data-testid="stVerticalBlockBorderWrapper"]:has(> .st-key-mq_chat_box){ scrollbar-width:none!important; }
+
+/* Power Query browser: tell the query (table) row apart from its column buttons */
+[class*="st-key-mqbrowse_"] button{               /* the query row: bold, full-weight */
+  font-weight:600!important; justify-content:flex-start!important; text-align:left!important;
+}
+[class*="st-key-mqcol_"] button{                   /* its columns: indented, smaller, lighter sub-items */
+  margin-left:14px!important; width:calc(100% - 14px)!important;
+  min-height:1.8rem!important; padding:.1rem .55rem!important;
+  font-size:.78rem!important; font-weight:400!important; color:var(--ink-2)!important;
+  background:transparent!important; border:1px solid var(--border)!important;
+  border-left:2px solid #C9CFDA!important;          /* a little nesting tick on the left */
+  justify-content:flex-start!important; text-align:left!important;
+}
+[class*="st-key-mqcol_"] button:hover{ color:var(--ink)!important; border-left-color:var(--accent)!important; }
+/* composer icon buttons (cancel ✕ + send ➤): equal circular glyphs flush inside the pill */
+.st-key-dax_cancel_btn, .st-key-dax_send_btn,
+.st-key-mq_cancel_btn, .st-key-mq_send_btn{
+  display:flex!important; justify-content:center!important; align-items:center!important;   /* center in its column */
+}
+.st-key-dax_cancel_btn button, .st-key-dax_send_btn button,
+.st-key-mq_cancel_btn button, .st-key-mq_send_btn button{
+  width:2.3rem!important; min-width:2.3rem!important; height:2.3rem!important; min-height:2.3rem!important;
+  padding:0!important; border-radius:50%!important;
   display:flex!important; align-items:center; justify-content:center;
+  transition:background .15s ease, transform .08s ease;
 }
-.st-key-dax_cancel_btn button *, .st-key-dax_send_btn button *{
-  font-size:1.25rem!important; line-height:1!important; margin:0!important;
+.st-key-dax_send_btn button:active, .st-key-mq_send_btn button:active{ transform:scale(.92); }
+.st-key-dax_cancel_btn button *, .st-key-dax_send_btn button *,
+.st-key-mq_cancel_btn button *, .st-key-mq_send_btn button *{
+  font-size:1.2rem!important; line-height:1!important; margin:0!important;
 }
-/* send = gold; cancel = neutral outline */
-.st-key-dax_send_btn button{ background:var(--accent)!important; border:1px solid var(--accent)!important; color:#1B1F2A!important; }
-.st-key-dax_send_btn button:hover{ background:var(--accent-2)!important; border-color:var(--accent-2)!important; }
-.st-key-dax_cancel_btn button{ background:var(--surface)!important; border:1.5px solid #C9CFDA!important; color:var(--ink-2)!important; }
-.st-key-dax_cancel_btn button:hover{ border-color:var(--ink)!important; color:var(--ink)!important; }
+/* send = solid gold circle; cancel = subtle ghost (no border, light glyph) so the gold action leads */
+.st-key-dax_send_btn button, .st-key-mq_send_btn button{ background:var(--accent)!important; border:none!important; color:#1B1F2A!important; box-shadow:0 1px 4px rgba(27,31,42,.12)!important; }
+.st-key-dax_send_btn button:hover, .st-key-mq_send_btn button:hover{ background:var(--accent-2)!important; }
+.st-key-dax_cancel_btn button, .st-key-mq_cancel_btn button{ background:transparent!important; border:none!important; color:var(--ink-3, #9AA1AE)!important; box-shadow:none!important; }
+.st-key-dax_cancel_btn button:hover, .st-key-mq_cancel_btn button:hover{ background:rgba(27,31,42,.06)!important; color:var(--ink)!important; }
 
 /* code blocks → monospace data surface */
 [data-testid="stCode"], pre{ border-radius:10px!important; border:1px solid var(--border)!important; }

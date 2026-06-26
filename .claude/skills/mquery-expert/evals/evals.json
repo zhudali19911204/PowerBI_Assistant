@@ -1,0 +1,27 @@
+{
+  "skill_name": "mquery-expert",
+  "shared_model_schema": "QUERY GROUNDING (Power BI, an existing import query to clean).\n\nCURRENT QUERY 'Sales' (M):\nlet\n    Source = Excel.Workbook(File.Contents(\"C:\\\\data\\\\sales.xlsx\"), null, true),\n    Sheet = Source{[Item=\"Sheet1\", Kind=\"Sheet\"]}[Data],\n    #\"Promoted Headers\" = Table.PromoteHeaders(Sheet, [PromoteAllScalars=true])\nin\n    #\"Promoted Headers\"\n\nOUTPUT COLUMNS of 'Sales' (all currently typed text/any):\n  [Order ID] (text)\n  [Customer Number] (text)\n  [Order Date] (text)        -- looks like M/D/YYYY strings\n  [Region] (text)            -- has leading/trailing spaces and some blanks\n  [Quantity] (text)          -- numeric-looking text\n  [Amount] (text)            -- numeric-looking text\n\nOTHER REFERENCEABLE QUERIES / PARAMETERS:\n  'Dim_Region'  (table query)",
+  "evals": [
+    {
+      "id": 0,
+      "name": "clean-blanks-types",
+      "prompt": "Using the query grounding below, clean the 'Sales' query: drop rows where Customer Number is blank, trim the Region text, and set proper data types (Order Date as a date, Quantity as a whole number, Amount as a decimal number). Build on the existing query and explain briefly.\n\n<QUERY_GROUNDING>",
+      "expected_output": "A full let ... in query that starts from #\"Promoted Headers\" (does NOT rewrite the Excel.Workbook source), then: filters with each [Customer Number] <> null and [Customer Number] <> \"\"; trims Region via Table.TransformColumns(..., {{\"Region\", Text.Trim, type text}}); and sets types LAST via Table.TransformColumnTypes with a culture (e.g. \"en-US\") mapping Order Date->type date, Quantity->Int64.Type, Amount->type number. Power BI-style step names. References only existing columns.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "dedupe-and-merge",
+      "prompt": "On the 'Sales' query below, remove fully duplicate rows, then bring in the Region's description from the Dim_Region query by joining on Region. Build on the existing query.\n\n<QUERY_GROUNDING>",
+      "expected_output": "A query that appends onto the existing last step: Table.Distinct for full-row dedupe; then Table.NestedJoin(prev, {\"Region\"}, #\"Dim_Region\", {\"Region\"}, \"dim\", JoinKind.LeftOuter) followed by Table.ExpandTableColumn to surface the description column. References #\"Dim_Region\" (a real query in the grounding) and only existing columns. Does not rewrite the source.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "robust-numeric-conversion",
+      "prompt": "The Amount column in 'Sales' is text and sometimes contains junk like 'N/A' or empty strings. Convert it to a number safely without breaking the refresh, and drop rows where it can't be converted. Use the grounding below.\n\n<QUERY_GROUNDING>",
+      "expected_output": "Handles errors deliberately rather than a bare type ascription: e.g. Table.TransformColumns(prev, {{\"Amount\", each try Number.From(_) otherwise null, type number}}) (or replace 'N/A'/\"\" with null first), then Table.SelectRows / Table.RemoveRowsWithErrors to drop the unconvertible rows. Explains that a plain TransformColumnTypes would leave Error cells that propagate into the model. Builds on the existing query, real columns only.",
+      "files": []
+    }
+  ]
+}

@@ -125,6 +125,14 @@ class LiveDesktopWriter:
             _disconnect(server)
 
 
+    # NOTE: there is deliberately no `write_m_partition`. Writing Power Query (M) into an OPEN Power BI
+    # Desktop model via this external connection is unsupported and crashes Desktop's Mashup query
+    # navigator (verified — NullReferenceException in `Microsoft.Mashup.Client.UI...QueriesNavigatorModelBase
+    # .IsQueryGroupNode`). Measures and calculated tables above ARE writable (pure model objects, no Mashup
+    # UI), but M partitions are not. The M assistant therefore offers the verified M for the user to paste
+    # into Power Query's Advanced Editor instead of writing it back. See memory: mquery-refresh-verification.
+
+
 def _disconnect(server: Any) -> None:
     try:
         server.Disconnect()
