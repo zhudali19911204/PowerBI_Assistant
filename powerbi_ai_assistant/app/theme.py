@@ -31,7 +31,16 @@ html, body, [data-testid="stAppViewContainer"], .stMarkdown, p, span, label, div
 }
 /* base colors come from the Streamlit theme (config.toml) so light AND dark both stay readable;
    we only layer fonts/accent/shape on top. */
-[data-testid="stHeader"]{ background:transparent; }
+/* The fixed, transparent Streamlit header otherwise overlaps (and steals clicks from) the top of the first
+   main-pane element — that's why the top assistant nav was only clickable along its bottom edge. Let clicks
+   pass through the header's EMPTY area to the content beneath, while keeping its own controls (sidebar
+   toggle, toolbar menu) clickable. */
+[data-testid="stHeader"]{ background:transparent; pointer-events:none; }
+/* Re-enable ONLY the real interactive controls — not the full-width wrapper divs, which would re-capture
+   the clicks. Everything else in the header passes clicks through to the content beneath. */
+[data-testid="stHeader"] button,
+[data-testid="stHeader"] a,
+[data-testid="stToolbar"]{ pointer-events:auto; }
 .block-container{ padding-top:1rem; max-width:1180px; }
 h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:inherit; }
 
@@ -99,7 +108,7 @@ h1,h2,h3,h4{ font-family:var(--font-display); letter-spacing:-.02em; color:inher
 /* ---- top assistant nav (main menu): a separated bar of equal pill buttons ---- */
 .st-key-cap_nav{
   border-bottom:1.5px solid var(--border)!important;
-  padding-bottom:.7rem!important; margin-bottom:1rem!important;
+  padding-bottom:.7rem!important; margin-bottom:1rem!important; margin-top:1.4rem!important;  /* clear the fixed header */
 }
 .st-key-cap_nav [data-testid="stHorizontalBlock"]{ gap:.5rem!important; }
 .st-key-cap_nav button{
